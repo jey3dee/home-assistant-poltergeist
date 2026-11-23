@@ -1,3 +1,5 @@
+import asyncio
+
 from custom_components.poltergeist.const import DOMAIN
 
 from .helpers import add_area, add_binary_sensor, setup_poltergeist
@@ -40,3 +42,26 @@ async def test_subscription_is_refused_for_non_admins(
     response = await client.receive_json()
     assert not response["success"]
     assert response["error"]["code"] == "unauthorized"
+
+
+async def test_subscription_survives_a_reload_of_the_entry(hass, hass_ws_client):
+    kitchen = add_area(hass, "Kitchen")
+    hall = add_area(hass, "Hall")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "poltergeist/subscribe"})
+    await client.receive_json()
+    assert len((await client.receive_json())["event"]["rooms"]) == 1
+
+    add_binary_sensor(hass, "hall_pir", area_id=hall.id)  # the entry reloads for the new room
+    await hass.async_block_till_done()
+    async with asyncio.timeout(3):  # without the fix nothing ever arrives
+        update = (await client.receive_json())["event"]
+    assert sorted(r["name"] for r in update["rooms"]) == ["Hall", "Kitchen"]
+
+    hass.states.async_set("binary_sensor.hall_pir", "on")  # and the new estimator keeps feeding it
+    await hass.async_block_till_done()
+    async with asyncio.timeout(3):
+        update = (await client.receive_json())["event"]
+    assert next(r for r in update["rooms"] if r["name"] == "Hall")["probability"] > 99.0

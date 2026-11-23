@@ -52,9 +52,10 @@ export class PoltergeistPanel extends LitElement {
       },
       { type: "poltergeist/subscribe" },
     );
+    // A refused subscription is not retried: `hass` changes on every state change, so retrying
+    // from willUpdate would ask again, and be refused again, many times a second.
     this._unsubscribe.catch((error: { code?: string; message?: string }) => {
       this._error = error.code ?? error.message ?? "unknown error";
-      this._unsubscribe = undefined;
     });
   }
 

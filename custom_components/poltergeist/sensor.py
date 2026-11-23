@@ -1,6 +1,7 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -9,8 +10,33 @@ from homeassistant.util import dt as dt_util
 
 from . import PoltergeistConfigEntry
 from .const import DOMAIN, HEAD_COUNT_STEP, HEARTBEAT, MIN_PUBLISH_INTERVAL, PROBABILITY_STEP
-from .estimator import Room
+from .estimator import TrackedRoom
 from .publishing import Publisher
+
+
+@dataclass(frozen=True, kw_only=True)
+class RoomSensorDescription(SensorEntityDescription):
+    value_fn: Callable[[TrackedRoom], float]
+    step: float  # smallest change worth writing, in the sensor's own unit
+
+
+DESCRIPTIONS = (
+    RoomSensorDescription(
+        key="occupancy_probability",
+        translation_key="occupancy_probability",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda room: room.probability,
+        step=PROBABILITY_STEP,
+    ),
+    RoomSensorDescription(
+        key="expected_head_count",
+        translation_key="expected_head_count",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda room: room.expected_count,
+        step=HEAD_COUNT_STEP,
+    ),
+)
 
 
 async def async_setup_entry(
@@ -18,50 +44,32 @@ async def async_setup_entry(
     entry: PoltergeistConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    entities: list[SensorEntity] = []
-    for area_id, room in entry.runtime_data.rooms.items():
-        entities.append(
-            _RoomSensor(
-                area_id, room, "occupancy_probability", lambda r: r.probability, PROBABILITY_STEP
-            )
-        )
-        entities.append(
-            _RoomSensor(
-                area_id, room, "expected_head_count", lambda r: r.expected_count, HEAD_COUNT_STEP
-            )
-        )
-    async_add_entities(entities)
+    async_add_entities(
+        RoomSensor(room, description)
+        for room in entry.runtime_data.rooms.values()
+        for description in DESCRIPTIONS
+    )
 
 
-class _RoomSensor(SensorEntity):
+class RoomSensor(SensorEntity):
+    entity_description: RoomSensorDescription
     _attr_has_entity_name = True
     _attr_should_poll = False
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(
-        self,
-        area_id: str,
-        room: Room,
-        key: str,
-        value: Callable[[Room], float],
-        step: float,
-    ):
+    def __init__(self, room: TrackedRoom, description: RoomSensorDescription):
+        self.entity_description = description
         self._room = room
-        self._value = value
-        self._publisher = Publisher(step, MIN_PUBLISH_INTERVAL, HEARTBEAT)
-        self._attr_unique_id = f"{area_id}_{key}"
-        self._attr_translation_key = key
-        if key == "occupancy_probability":
-            self._attr_native_unit_of_measurement = PERCENTAGE
+        self._publisher = Publisher(description.step, MIN_PUBLISH_INTERVAL, HEARTBEAT)
+        self._attr_unique_id = f"{room.spec.area_id}_{description.key}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, area_id)},
+            identifiers={(DOMAIN, room.spec.area_id)},
             name="Occupancy",
             suggested_area=room.spec.name,
         )
 
     @property
     def native_value(self) -> float:
-        return self._value(self._room)
+        return self.entity_description.value_fn(self._room)
 
     async def async_added_to_hass(self) -> None:
         self._publisher.mark(dt_util.utcnow().timestamp(), self.native_value)

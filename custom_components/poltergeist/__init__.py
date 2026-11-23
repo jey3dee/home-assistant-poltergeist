@@ -14,9 +14,9 @@ from homeassistant.loader import async_get_loaded_integration
 from homeassistant.util import dt as dt_util
 
 from . import panel, websocket_api
-from .const import DOMAIN, STORE_KEY, STORE_VERSION
+from .const import DOMAIN, STORE_KEY, STORE_VERSION, UPDATE_LISTENERS_KEY
 from .discovery import RoomSpec, discover_rooms
-from .estimator import Estimator
+from .estimator import Estimator, UpdateListeners
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ type PoltergeistConfigEntry = ConfigEntry[Estimator]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    hass.data[UPDATE_LISTENERS_KEY] = UpdateListeners()
     websocket_api.async_register(hass)
     return True
 
@@ -36,7 +37,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
 
     store: Store = Store(hass, STORE_VERSION, STORE_KEY)
     saved = (await store.async_load() or {}).get("rooms", {})
-    estimator = Estimator(hass, specs, store, saved, dt_util.utcnow().timestamp())
+    listeners: UpdateListeners = hass.data[UPDATE_LISTENERS_KEY]
+    estimator = Estimator(hass, specs, store, saved, dt_util.utcnow().timestamp(), listeners)
     entry.runtime_data = estimator
     _LOGGER.info(
         "Restored the belief of %d of %d rooms from the store",
@@ -47,6 +49,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     for undo in estimator.async_start():
         entry.async_on_unload(undo)
+    listeners.estimator = estimator
+    listeners.notify()  # connected panels learn about the new rooms after a reload
     entry.async_on_unload(_watch_registries(hass, entry, specs))
 
     version = async_get_loaded_integration(hass, DOMAIN).version
@@ -58,12 +62,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
 async def async_unload_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        listeners: UpdateListeners = hass.data[UPDATE_LISTENERS_KEY]
+        if listeners.estimator is entry.runtime_data:
+            listeners.estimator = None
         await entry.runtime_data.async_save()
         panel.async_remove_panel(hass)
     return unloaded
 
 
-async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_remove_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) -> None:
     await Store(hass, STORE_VERSION, STORE_KEY).async_remove()
 
 
@@ -80,14 +87,14 @@ def _remove_stale_devices(
 def _watch_registries(hass: HomeAssistant, entry: ConfigEntry, specs: dict[str, RoomSpec]):
     """Reload when the rooms or their sensors change, so entities follow the house."""
 
-    def shape(rooms: dict[str, RoomSpec]) -> dict:
+    def fingerprint(rooms: dict[str, RoomSpec]) -> dict:
         return {a: (r.name, sorted(r.sensors)) for a, r in rooms.items()}
 
-    current = shape(specs)
+    current = fingerprint(specs)
 
     @callback
     def changed(_event: Event) -> None:
-        if shape(discover_rooms(hass)) != current:
+        if fingerprint(discover_rooms(hass)) != current:
             _LOGGER.info("Rooms or motion sensors changed, reloading")
             hass.config_entries.async_schedule_reload(entry.entry_id)
 

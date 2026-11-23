@@ -129,3 +129,30 @@ async def test_heartbeat_rewrites_a_quiet_entity(hass, freezer):
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
     assert hass.states.get("sensor.kitchen_occupancy_probability").last_reported > reported
+
+
+async def test_an_unavailable_sensor_is_not_evidence_of_an_empty_room(hass, freezer):
+    kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+    hass.states.async_set(pir, "on")
+    await hass.async_block_till_done()
+    hass.states.async_set(pir, "unavailable")
+    await hass.async_block_till_done()
+    await settle(hass, freezer, seconds=3 * 3600)
+    # Three hours of real silence would end below 5 %. A dead sensor says nothing, so the
+    # belief only relaxes toward the prior.
+    assert float(hass.states.get("sensor.kitchen_occupancy_probability").state) > 15.0
+
+
+async def test_a_room_with_one_working_sensor_still_counts_silence(hass, freezer):
+    kitchen = add_area(hass, "Kitchen")
+    working = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    dead = add_binary_sensor(hass, "kitchen_pir_2", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+    hass.states.async_set(working, "on")
+    await hass.async_block_till_done()
+    hass.states.async_set(dead, "unavailable")
+    await hass.async_block_till_done()
+    await settle(hass, freezer, seconds=3 * 3600)
+    assert float(hass.states.get("sensor.kitchen_occupancy_probability").state) < 10.0

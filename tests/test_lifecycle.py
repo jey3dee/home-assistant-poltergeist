@@ -3,6 +3,8 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.poltergeist.const import DOMAIN
 
@@ -77,3 +79,38 @@ async def test_room_disappears_when_its_last_sensor_goes(hass):
 async def test_setup_with_no_sensors_is_fine(hass):
     entry = await setup_poltergeist(hass)
     assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_removal_after_a_pending_delayed_save_leaves_no_store(hass, hass_storage, freezer):
+    kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    entry = await setup_poltergeist(hass)
+    hass.states.async_set(pir, "on")  # schedules a delayed save
+    await hass.async_block_till_done()
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=5))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert DOMAIN not in hass_storage
+
+
+async def test_a_device_the_user_moved_to_another_area_stays_there(hass):
+    kitchen = add_area(hass, "Kitchen")
+    hall = add_area(hass, "Hall")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    entry = await setup_poltergeist(hass)
+    registry = dr.async_get(hass)
+    device = registry.async_get_device_by_identifier((DOMAIN, kitchen.id), entry.entry_id)
+    registry.async_update_device(device.id, area_id=hall.id)  # the user moves it
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    device = registry.async_get_device_by_identifier((DOMAIN, kitchen.id), entry.entry_id)
+    assert device.area_id == hall.id
+    # Entity ids are fixed at creation, so the entity is still found by its unique id.
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{kitchen.id}_occupancy_probability"
+    )
+    assert entity_id == "sensor.kitchen_occupancy_probability"

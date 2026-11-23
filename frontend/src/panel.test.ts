@@ -105,6 +105,17 @@ describe("poltergeist-panel", () => {
     expect(text(el)).toContain("unauthorized");
   });
 
+  it("does not retry a refused subscription on every hass update", async () => {
+    const { hass } = fakeHass({ reject: Object.assign(new Error("x"), { code: "unauthorized" }) });
+    const el = await mount(hass);
+    await new Promise((r) => setTimeout(r));
+    for (let i = 0; i < 3; i++) {
+      el.hass = { ...hass } as Hass; // Home Assistant sends a new hass on every state change
+      await el.updateComplete;
+    }
+    expect(hass.connection.subscribeMessage).toHaveBeenCalledTimes(1);
+  });
+
   it("offers the sidebar menu button on narrow screens and asks HA to toggle it", async () => {
     const { hass } = fakeHass();
     const el = await mount(hass, true);
