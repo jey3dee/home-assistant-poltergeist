@@ -118,3 +118,10 @@ def test_blind_advance_matches_oracle_without_evidence():
     belief.advance(1200.0, observed=False)
     oracle = forward_oracle(silent, [], 0.0, 1200.0, [0.0, 1.0, 0.0, 0.0])
     assert belief.probabilities == pytest.approx(oracle, abs=1e-3)
+
+
+def test_latest_never_goes_backwards_and_treats_zero_as_a_time():
+    belief = RoomBelief(PARAMS, t=0.0)
+    assert belief.latest(-5.0) == 0.0  # zero is a real time, not "unset"
+    assert belief.latest(7.0) == 7.0
+    assert RoomBelief(PARAMS).latest(3.0) == 3.0  # no time yet: take the given one

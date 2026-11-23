@@ -4,7 +4,7 @@ export interface Hass {
   connection: {
     subscribeMessage<T>(
       callback: (message: T) => void,
-      subscribeMessage: { type: string },
+      message: { type: string },
     ): Promise<() => void | Promise<void>>;
   };
 }

@@ -94,6 +94,14 @@ class RoomBelief:
     def expected_count(self) -> float:
         return float(np.dot(np.arange(N_STATES), self.probabilities))
 
+    def latest(self, t: float) -> float:
+        """`t`, or this belief's own time if that is later.
+
+        Wall-clock ticks and event timestamps can differ by a few milliseconds; the belief itself
+        never moves backwards (`advance` refuses), so callers clamp with this first.
+        """
+        return t if self.t is None else max(t, self.t)
+
     def advance(self, t: float, observed: bool = True) -> None:
         """Move the belief to time t.
 

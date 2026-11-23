@@ -7,7 +7,7 @@ A Home Assistant custom integration that estimates where people are in the house
 - Every Home Assistant **area** that contains an enabled `binary_sensor` with device class `motion` or `occupancy` becomes a room. The sensor's own area wins, otherwise its device's area.
 - Each room gets one device named *Occupancy* with two sensors: the occupancy probability in percent and the expected head count.
 - A motion sensor switching to `on` is evidence that someone is there; silence slowly argues for an empty room. Each room is filtered separately, in continuous time, over a head count of 0, 1, 2 or 3+. The default rates are priors, nothing is learned yet.
-- The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down is not counted as silence.
+- The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down is not counted as silence, and neither is time while all of a room's sensors are unavailable.
 - An admin-only sidebar panel lists the rooms live. Its Map, People, Sensors and Health tabs are empty.
 
 Values are written to Home Assistant only when they move by 5 percentage points (0.1 persons for the head count), at most every 5 s, and at least every 5 minutes.
