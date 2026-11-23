@@ -10,6 +10,8 @@ A Home Assistant custom integration that estimates where people are in the house
 - The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down is not counted as silence, and neither is time while all of a room's sensors are unavailable.
 - An admin-only sidebar panel lists the rooms live. Its Map, People, Sensors and Health tabs are empty.
 
+The head count is tracked from 0 up to a highest value you can change under Settings > Devices & services > Poltergeist > Configure (default 4, range 1 to 15; the top count means "this many or more"). A motion sensor cannot tell these counts apart, so a higher value only matters once sensors that count people are added. Changing it reloads the integration and keeps the saved beliefs.
+
 Values are written to Home Assistant only when they move by 5 percentage points (0.1 persons for the head count), at most every 5 s, and at least every 5 minutes.
 
 Not there yet: persons, other sensor kinds, learning, movement between rooms, the intruder hypothesis, alerts. See `planning/tickets/implementation/`.

@@ -43,6 +43,19 @@ def test_matches_oracle_at_checkpoints(seed):
 ORACLE_TOLERANCE = 1e-3
 
 
+@pytest.mark.parametrize("max_people", [1, 2, 8, 15])
+def test_matches_oracle_for_other_room_sizes(max_people):
+    params = RoomParams(arrival_rate=1 / 1800, max_people=max_people)
+    scenario = simulate(params, duration=2 * 3600.0, seed=7)
+    checkpoints = [900.0, 3600.0, 2 * 3600.0]
+    model = run_model(params, scenario, checkpoints)
+    prior = RoomBelief(params).probabilities
+    for c in checkpoints:
+        events = [t for t in scenario.events if t <= c]
+        oracle = forward_oracle(params, events, 0.0, c, prior)
+        assert model[c] == pytest.approx(oracle, abs=ORACLE_TOLERANCE), (max_people, c)
+
+
 def test_posterior_beats_prior_on_simulated_truth():
     log_post, log_prior = [], []
     prior = RoomBelief(PARAMS).probabilities

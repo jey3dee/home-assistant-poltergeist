@@ -114,3 +114,35 @@ async def test_a_device_the_user_moved_to_another_area_stays_there(hass):
         "sensor", DOMAIN, f"{kitchen.id}_occupancy_probability"
     )
     assert entity_id == "sensor.kitchen_occupancy_probability"
+
+
+async def _set_max_people(hass, entry, value):
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], {"max_people": value})
+    await hass.async_block_till_done()
+
+
+async def test_changing_the_highest_head_count_reloads_with_the_new_size(hass):
+    kitchen = add_area(hass, "Kitchen")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    entry = await setup_poltergeist(hass)
+    assert len(entry.runtime_data.rooms[kitchen.id].belief.probabilities) == 5
+
+    await _set_max_people(hass, entry, 8)
+    assert entry.state is ConfigEntryState.LOADED
+    assert len(entry.runtime_data.rooms[kitchen.id].belief.probabilities) == 9
+
+
+async def test_a_belief_survives_a_change_of_the_highest_head_count(hass):
+    kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    entry = await setup_poltergeist(hass)
+    hass.states.async_set(pir, "on")
+    await hass.async_block_till_done()
+    before = entry.runtime_data.rooms[kitchen.id].belief.p_occupied
+    assert before > 0.99
+
+    await _set_max_people(hass, entry, 2)
+    belief = entry.runtime_data.rooms[kitchen.id].belief
+    assert len(belief.probabilities) == 3
+    assert belief.p_occupied > 0.99

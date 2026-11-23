@@ -1,3 +1,3 @@
-from .room import N_STATES, RoomBelief, RoomParams
+from .room import MAX_PEOPLE_LIMIT, RoomBelief, RoomParams
 
-__all__ = ["N_STATES", "RoomBelief", "RoomParams"]
+__all__ = ["MAX_PEOPLE_LIMIT", "RoomBelief", "RoomParams"]

@@ -14,9 +14,17 @@ from homeassistant.loader import async_get_loaded_integration
 from homeassistant.util import dt as dt_util
 
 from . import panel, websocket_api
-from .const import DOMAIN, STORE_KEY, STORE_VERSION, UPDATE_LISTENERS_KEY
+from .const import (
+    CONF_MAX_PEOPLE,
+    DEFAULT_MAX_PEOPLE,
+    DOMAIN,
+    STORE_KEY,
+    STORE_VERSION,
+    UPDATE_LISTENERS_KEY,
+)
 from .discovery import RoomSpec, discover_rooms
 from .estimator import Estimator, UpdateListeners
+from .model import RoomParams
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +46,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     store: Store = Store(hass, STORE_VERSION, STORE_KEY)
     saved = (await store.async_load() or {}).get("rooms", {})
     listeners: UpdateListeners = hass.data[UPDATE_LISTENERS_KEY]
-    estimator = Estimator(hass, specs, store, saved, dt_util.utcnow().timestamp(), listeners)
+    params = RoomParams(max_people=entry.options.get(CONF_MAX_PEOPLE, DEFAULT_MAX_PEOPLE))
+    estimator = Estimator(
+        hass, specs, store, saved, dt_util.utcnow().timestamp(), listeners, params
+    )
     entry.runtime_data = estimator
     _LOGGER.info(
         "Restored the belief of %d of %d rooms from the store",

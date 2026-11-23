@@ -7,19 +7,18 @@ spec for a one-room house, up to the grid step.
 
 import numpy as np
 
-N_STATES = 4
-
 
 def forward_oracle(params, events, t_start, t_end, initial, step=0.25):
     """Belief over head count at t_end, given motion events (seconds) in [t_start, t_end]."""
-    n = np.arange(N_STATES)
+    n_states = params.max_people + 1
+    n = np.arange(n_states)
     rates = np.where(n == 0, params.event_rate_empty, params.event_rate_present)
-    trans = np.zeros((N_STATES, N_STATES))
-    for k in range(N_STATES):
-        up = params.arrival_rate if k < N_STATES - 1 else 0.0
+    trans = np.zeros((n_states, n_states))
+    for k in range(n_states):
+        up = params.arrival_rate if k < n_states - 1 else 0.0
         down = k * params.leave_rate
         trans[k, k] = 1.0 - (up + down) * step
-        if k < N_STATES - 1:
+        if k < n_states - 1:
             trans[k, k + 1] = up * step
         if k > 0:
             trans[k, k - 1] = down * step
@@ -38,3 +37,17 @@ def forward_oracle(params, events, t_start, t_end, initial, step=0.25):
             belief = belief * (1.0 - rates * step)
         belief = belief / belief.sum()
     return belief
+
+
+def expm_reference(matrix, t, terms=24):
+    """exp(matrix * t) by scaling and squaring with a Taylor series: no eigendecomposition."""
+    a = matrix * t
+    squarings = max(0, int(np.ceil(np.log2(max(np.abs(a).sum(axis=1).max(), 1e-300)))) + 1)
+    a = a / 2**squarings
+    result = term = np.eye(len(a))
+    for k in range(1, terms):
+        term = term @ a / k
+        result = result + term
+    for _ in range(squarings):
+        result = result @ result
+    return result

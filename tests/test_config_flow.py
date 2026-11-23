@@ -1,7 +1,10 @@
+import pytest
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
 from custom_components.poltergeist.const import DOMAIN
+
+from .helpers import setup_poltergeist
 
 
 async def test_user_flow_creates_the_entry(hass):
@@ -24,3 +27,27 @@ async def test_only_one_instance(hass):
     )
     assert second["type"] is FlowResultType.ABORT
     assert second["reason"] == "single_instance_allowed"
+
+
+async def test_options_form_offers_four_as_the_default(hass):
+    entry = await setup_poltergeist(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["data_schema"]({})["max_people"] == 4
+
+
+async def test_options_flow_saves_the_highest_head_count(hass):
+    entry = await setup_poltergeist(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"max_people": 8})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {"max_people": 8}
+
+
+@pytest.mark.parametrize("bad", [0, 16])
+async def test_options_flow_refuses_values_outside_the_checked_range(hass, bad):
+    entry = await setup_poltergeist(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(result["flow_id"], {"max_people": bad})
+    assert entry.options == {}

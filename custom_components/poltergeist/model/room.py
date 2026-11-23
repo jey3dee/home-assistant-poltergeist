@@ -1,6 +1,6 @@
 """Head-count belief for one room, filtered in continuous time from motion events.
 
-State: head count 0, 1, 2, 3+ (the last state stands for three or more people).
+State: head count 0, 1, ... `max_people`; the last state stands for "that many or more".
 Dynamics: a birth-death chain. One more person arrives at `arrival_rate`; each person present
 leaves at `leave_rate`.
 Evidence: motion events form a Poisson process whose rate depends on the room being empty
@@ -15,7 +15,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-N_STATES = 4
+MAX_PEOPLE_LIMIT = 15
+# The matrix exponential comes from an eigendecomposition whose accuracy falls quickly with size
+# (measured worst error in a probability: 3e-11 at 16 states, 2e-7 at 24, 3e-3 at 32), so the
+# range is capped where the error is still far below anything visible.
 
 
 @dataclass(frozen=True)
@@ -24,22 +27,29 @@ class RoomParams:
     leave_rate: float = 1.0 / 1800.0  # per second and person present
     event_rate_present: float = 1.0 / 300.0  # motion events per second while occupied
     event_rate_empty: float = 1.0 / 2_592_000.0  # false motion events per second while empty
+    max_people: int = 4  # highest head count tracked; the top state means "this many or more"
 
     def __post_init__(self):
         if self.arrival_rate <= 0 or self.leave_rate <= 0:
             raise ValueError("arrival_rate and leave_rate must be positive")
         if self.event_rate_present < 0 or self.event_rate_empty < 0:
             raise ValueError("event rates must not be negative")
+        if not 1 <= self.max_people <= MAX_PEOPLE_LIMIT:
+            raise ValueError(f"max_people must be between 1 and {MAX_PEOPLE_LIMIT}")
+
+    @property
+    def n_states(self) -> int:
+        return self.max_people + 1
 
     @property
     def event_rates(self) -> np.ndarray:
-        return np.array([self.event_rate_empty] + [self.event_rate_present] * (N_STATES - 1))
+        return np.array([self.event_rate_empty] + [self.event_rate_present] * self.max_people)
 
     @property
     def generator(self) -> np.ndarray:
-        q = np.zeros((N_STATES, N_STATES))
-        for k in range(N_STATES):
-            if k < N_STATES - 1:
+        q = np.zeros((self.n_states, self.n_states))
+        for k in range(self.n_states):
+            if k < self.max_people:
                 q[k, k + 1] = self.arrival_rate
             if k > 0:
                 q[k, k - 1] = k * self.leave_rate
@@ -81,7 +91,7 @@ class RoomBelief:
 
     def _stationary(self) -> np.ndarray:
         w = [1.0]
-        for k in range(1, N_STATES):
+        for k in range(1, self.params.n_states):
             w.append(w[-1] * self.params.arrival_rate / (k * self.params.leave_rate))
         w = np.array(w)
         return w / w.sum()
@@ -92,7 +102,7 @@ class RoomBelief:
 
     @property
     def expected_count(self) -> float:
-        return float(np.dot(np.arange(N_STATES), self.probabilities))
+        return float(np.dot(np.arange(self.params.n_states), self.probabilities))
 
     def latest(self, t: float) -> float:
         """`t`, or this belief's own time if that is later.
@@ -137,4 +147,12 @@ class RoomBelief:
 
     @classmethod
     def from_snapshot(cls, params: RoomParams, data: dict) -> RoomBelief:
-        return cls(params, probabilities=data["probabilities"], t=data["t"])
+        stored = np.asarray(data["probabilities"], float)
+        n = params.n_states
+        # The room size may have changed since the belief was saved: widen with zeros, or fold the
+        # probability of the removed head counts into the new top state ("or more").
+        fitted = np.zeros(n)
+        fitted[: min(n, len(stored))] = stored[:n]
+        if len(stored) > n:
+            fitted[n - 1] += stored[n:].sum()
+        return cls(params, probabilities=fitted, t=data["t"])

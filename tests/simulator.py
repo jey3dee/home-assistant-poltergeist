@@ -24,13 +24,13 @@ class Scenario:
         return count
 
 
-def simulate(params, duration: float, seed: int, initial_count: int = 0, max_count: int = 3):
+def simulate(params, duration: float, seed: int, initial_count: int = 0):
     rng = np.random.default_rng(seed)
     t, n = 0.0, initial_count
     changes = [(0.0, n)]
     events: list[float] = []
     while t < duration:
-        up = params.arrival_rate if n < max_count else 0.0
+        up = params.arrival_rate if n < params.max_people else 0.0
         down = n * params.leave_rate
         event = params.event_rate_empty if n == 0 else params.event_rate_present
         total = up + down + event

@@ -71,11 +71,12 @@ class Estimator:
         saved: dict[str, dict],
         now: float,
         update_listeners: UpdateListeners,
+        params: RoomParams,
     ):
         self.hass = hass
         self._store = store
         self._update_listeners = update_listeners
-        self._params = RoomParams()
+        self._params = params
         self.rooms: dict[str, TrackedRoom] = {}
         for area_id, spec in specs.items():
             if area_id in saved:

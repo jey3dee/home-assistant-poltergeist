@@ -1,5 +1,8 @@
 DOMAIN = "poltergeist"
 
+CONF_MAX_PEOPLE = "max_people"
+DEFAULT_MAX_PEOPLE = 4
+
 STORE_VERSION = 1
 STORE_KEY = DOMAIN
 

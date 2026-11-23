@@ -10,6 +10,16 @@
       "single_instance_allowed": "Poltergeist is already set up."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Poltergeist",
+        "description": "How many people a room can hold before the top count means \"this many or more\". A single motion sensor cannot tell these counts apart; a higher value only matters once sensors that count people are added. Changing it reloads the integration.",
+        "data": { "max_people": "Highest head count to track" },
+        "data_description": { "max_people": "1 to 15. The default is 4." }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "occupancy_probability": { "name": "Probability" },
