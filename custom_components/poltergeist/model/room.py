@@ -47,16 +47,33 @@ class RoomParams:
         return q
 
 
+class _Propagator:
+    """exp(A dt) for a fixed matrix A, from one eigendecomposition.
+
+    A is a sub-generator of a birth-death chain: it is similar to a symmetric tridiagonal
+    matrix, so its eigenvalues are real and it is diagonalisable.
+    """
+
+    def __init__(self, a: np.ndarray):
+        self._eigenvalues, self._vectors = np.linalg.eig(a)
+        self._vectors_inv = np.linalg.inv(self._vectors)
+        # Subtracting the largest eigenvalue only rescales the result, which is renormalised by
+        # the caller. It stops very long gaps from underflowing to an all-zero vector.
+        self._shift = float(self._eigenvalues.max())
+
+    def apply(self, row: np.ndarray, dt: float) -> np.ndarray:
+        decay = np.exp((self._eigenvalues - self._shift) * dt)
+        return row @ self._vectors @ np.diag(decay) @ self._vectors_inv
+
+
 class RoomBelief:
     def __init__(self, params: RoomParams, probabilities=None, t: float | None = None):
         self.params = params
         # Rows are the "from" state, so a belief row vector moves as `belief @ propagator`.
         # The sub-generator A = Q - diag(rates) has real, distinct eigenvalues (it is similar to a
         # symmetric tridiagonal matrix), so exp(A dt) comes from one eigendecomposition.
-        a = params.generator - np.diag(params.event_rates)
-        self._eigenvalues, self._vectors = np.linalg.eig(a)
-        self._vectors_inv = np.linalg.inv(self._vectors)
-        self._shift = float(self._eigenvalues.max())
+        self._observed = _Propagator(params.generator - np.diag(params.event_rates))
+        self._blind = _Propagator(params.generator)
         self.probabilities = (
             self._stationary() if probabilities is None else np.asarray(probabilities, float)
         )
@@ -77,8 +94,13 @@ class RoomBelief:
     def expected_count(self) -> float:
         return float(np.dot(np.arange(N_STATES), self.probabilities))
 
-    def advance(self, t: float) -> None:
-        """Move the belief to time t, with no motion event in between."""
+    def advance(self, t: float, observed: bool = True) -> None:
+        """Move the belief to time t.
+
+        With `observed=True` nobody saw a motion event in between, which is itself evidence.
+        With `observed=False` nobody was listening (for example Home Assistant was down), so the
+        gap says nothing about events and the belief only follows the dynamics.
+        """
         if self.t is None:
             self.t = t
             return
@@ -86,11 +108,8 @@ class RoomBelief:
         if dt < 0:
             raise ValueError(f"time went backwards by {-dt} s")
         if dt > 0:
-            # Subtracting the largest eigenvalue only rescales; the belief is renormalised below.
-            # It stops very long gaps from underflowing to an all-zero vector.
-            decay = np.exp((self._eigenvalues - self._shift) * dt)
-            moved = self.probabilities @ self._vectors @ np.diag(decay) @ self._vectors_inv
-            self.probabilities = self._normalised(moved)
+            propagator = self._observed if observed else self._blind
+            self.probabilities = self._normalised(propagator.apply(self.probabilities, dt))
         self.t = t
 
     def observe_event(self, t: float) -> None:
@@ -109,5 +128,5 @@ class RoomBelief:
         return {"probabilities": [float(p) for p in self.probabilities], "t": self.t}
 
     @classmethod
-    def from_snapshot(cls, params: RoomParams, data: dict) -> "RoomBelief":
+    def from_snapshot(cls, params: RoomParams, data: dict) -> RoomBelief:
         return cls(params, probabilities=data["probabilities"], t=data["t"])

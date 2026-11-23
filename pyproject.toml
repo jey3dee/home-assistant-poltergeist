@@ -6,7 +6,7 @@ requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest-homeassistant-custom-component", "ruff"]
+dev = ["pytest-homeassistant-custom-component", "ruff", "home-assistant-frontend==20260930.5"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

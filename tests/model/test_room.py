@@ -89,3 +89,32 @@ def test_snapshot_round_trip():
 def test_params_must_be_positive_where_required():
     with pytest.raises(ValueError):
         RoomParams(leave_rate=0.0)
+
+
+def test_blind_advance_does_not_treat_the_gap_as_silence():
+    # While nobody was listening (HA down), no-event evidence must not accumulate.
+    observed = RoomBelief(PARAMS)
+    observed.observe_event(0.0)
+    blind = RoomBelief(PARAMS)
+    blind.observe_event(0.0)
+    observed.advance(1800.0)
+    blind.advance(1800.0, observed=False)
+    assert blind.p_occupied > observed.p_occupied
+
+
+def test_blind_advance_over_a_long_gap_returns_to_the_prior():
+    belief = RoomBelief(PARAMS)
+    belief.observe_event(0.0)
+    belief.advance(10 * 86400.0, observed=False)
+    assert belief.probabilities == pytest.approx(stationary(PARAMS), abs=1e-9)
+
+
+def test_blind_advance_matches_oracle_without_evidence():
+    from tests.oracle import forward_oracle
+
+    silent = RoomParams(event_rate_present=0.0, event_rate_empty=0.0)
+    belief = RoomBelief(silent, t=0.0)
+    belief.probabilities = np.array([0.0, 1.0, 0.0, 0.0])
+    belief.advance(1200.0, observed=False)
+    oracle = forward_oracle(silent, [], 0.0, 1200.0, [0.0, 1.0, 0.0, 0.0])
+    assert belief.probabilities == pytest.approx(oracle, abs=1e-3)
