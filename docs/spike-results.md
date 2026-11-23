@@ -1,0 +1,37 @@
+# Slice 01 spike results
+
+Run on 2026-11-23 against the Home Assistant Core container `ghcr.io/home-assistant/home-assistant:2026.11.2` (amd64, Python 3.14.10), with the integration mounted read-only into `/config/custom_components/poltergeist`. Nothing here was run on a Raspberry Pi or HA Green.
+
+These answer the open items of `planning/spec.md` section 16.
+
+| Item | Result | How it was checked |
+|---|---|---|
+| numpy in the Core image | **Yes, 2.3.2** | `import numpy` inside the container, no integration involved |
+| scipy in the Core image | **Yes, 1.18.1** (pandas 2.3.3 too) | `import scipy` inside the container. This **contradicts** `planning/research/custom-integration.md`, which inferred from `requirements_all.txt` that scipy was absent. The integration declares no `requirements`. |
+| `recorder.history` from an integration | **Works** on a real SQLite recorder | A throwaway component (not in this repo) called `history.get_significant_states(..., significant_changes_only=False)` through `get_instance(hass).async_add_executor_job` and got the full `unknown, off, on, off, off, off` sequence of a test motion sensor. State objects carry a `context` attribute; whether it holds the user and parent ids was not inspected. |
+| What remains after removing the config entry | **Nothing** | Deleted the entry over the REST API. The `.storage/poltergeist` file, all four entities, both devices and the sidebar panel were gone (live registries over WebSocket, and the registry files after their write delay). |
+| Static panel file authentication | **Served without a login** | `curl` of `/poltergeist_static/panel.js` without a token returned 200. The bundle therefore holds no secrets. |
+| `require_admin` | Hides the panel from non-admins; the WebSocket command refuses non-admins | The unit test `test_subscription_is_refused_for_non_admins` against the test harness. Direct URL navigation by a non-admin was not tried in a browser. |
+| State survives a restart | **Yes** | After `docker restart`, the kitchen room came back at 97.9 % from a saved belief of 98.9 %. The store is written at shutdown (Home Assistant's final write). |
+| Panel in the real frontend | **Works** | Headless Chromium logged into the dev instance: the Overview listed both rooms, the Hall room went from 17 % to 100 % within 1.5 s of a motion event while the panel was open, and on a 420 px wide screen the menu button opened Home Assistant's sidebar. |
+
+## Cost measurement (desktop only)
+
+The current single-room filter, measured on the development machine, not on target hardware:
+
+| Work | Time |
+|---|---|
+| One event update, one room | 43 µs |
+| Advancing all rooms at one 5 s tick, 10 rooms | 0.32 ms |
+| Advancing all rooms at one 5 s tick, 40 rooms | 1.3 ms |
+
+This is the independent-room model of this slice only. It says nothing about the zone clusters of later slices, and the event-loop stall test (spec section 16, item 1) on a Pi or HA Green is still to do.
+
+## Go/no-go
+
+- **Go on:** numpy and scipy availability, `recorder.history`, removal behaviour, persistence across restarts, panel delivery.
+- **Not decided here:** the event-loop stall on target hardware (item 1) and whether the Supervisor watchdog is on by default (item 7). Neither was measured in this slice.
+
+## Test harness gap
+
+`pytest-homeassistant-custom-component` (latest 0.13.375, 2026-10-25) pins `homeassistant==2026.10.4`. Installing 2026.11.2 next to it fails at import (`httpx was already imported`). The automated tests therefore run against 2026.10.4, and the runtime checks above against 2026.11.2. `hacs.json` names 2026.11.0 as the minimum, which the unit tests do not exercise.

@@ -38,6 +38,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     saved = (await store.async_load() or {}).get("rooms", {})
     estimator = Estimator(hass, specs, store, saved, dt_util.utcnow().timestamp())
     entry.runtime_data = estimator
+    _LOGGER.info(
+        "Restored the belief of %d of %d rooms from the store",
+        len(saved.keys() & specs.keys()),
+        len(specs),
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     for undo in estimator.async_start():
