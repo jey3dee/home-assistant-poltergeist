@@ -55,7 +55,11 @@ def ws_sensors(hass: HomeAssistant, connection: websocket_api.ActiveConnection, 
                 for entity_id in sorted(assigned)
             ],
             "candidates": [
-                {"entity_id": e.entity_id, "name": _name(e)}
+                {
+                    "entity_id": e.entity_id,
+                    "name": _name(e),
+                    "ha_area_id": home_assistant_area(hass, e),
+                }
                 for e in sorted(entities.values(), key=lambda e: e.entity_id)
                 if e.domain == "binary_sensor" and not e.disabled and e.entity_id not in assigned
             ],

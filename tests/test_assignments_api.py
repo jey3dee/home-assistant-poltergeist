@@ -44,7 +44,9 @@ async def test_sensors_lists_rooms_assignments_and_candidates(hass, hass_ws_clie
             "room": kitchen.id,
         }
     ]
-    assert [c["entity_id"] for c in result["candidates"]] == [door]
+    assert result["candidates"] == [
+        {"entity_id": door, "name": "front_door", "ha_area_id": hall.id}
+    ]
 
 
 async def test_assigning_moves_the_sensor_and_survives_a_restart(hass, hass_ws_client):

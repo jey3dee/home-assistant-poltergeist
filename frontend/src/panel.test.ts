@@ -14,6 +14,8 @@ function fakeHass(options: { reject?: Error } = {}) {
         return options.reject ? Promise.reject(options.reject) : Promise.resolve(unsubscribe);
       }),
     },
+    callWS: vi.fn(() => new Promise(() => undefined)),
+    states: {},
   } as unknown as Hass;
   return { hass, calls, unsubscribe };
 }
@@ -75,7 +77,42 @@ describe("poltergeist-panel", () => {
     const el = await mount(hass);
     calls[0].callback({ rooms: [] });
     await el.updateComplete;
-    expect(text(el)).toContain("motion or occupancy sensor");
+    expect(text(el)).toContain("Rooms are the areas of Home Assistant");
+  });
+
+  it("shows a room without sensors as such, with no probability", async () => {
+    const { hass, calls } = fakeHass();
+    const el = await mount(hass);
+    calls[0].callback({
+      rooms: [
+        kitchen,
+        { area_id: "bedroom", name: "Bedroom", sensors: [], probability: null, expected_count: null },
+      ],
+    });
+    await el.updateComplete;
+    const rows = [...el.shadowRoot!.querySelectorAll(".row")].map((r) =>
+      r.textContent!.replace(/\s+/g, " ").trim(),
+    );
+    expect(rows[0]).toContain("87 %");
+    expect(rows[1]).toContain("Bedroom");
+    expect(rows[1]).toContain("no sensors");
+    expect(rows[1]).not.toContain("%");
+    expect(el.shadowRoot!.querySelectorAll(".fill")).toHaveLength(1);
+  });
+
+  it("shows the sensor assignments on the Sensors tab, with the hass object", async () => {
+    const { hass, calls } = fakeHass();
+    const el = await mount(hass);
+    calls[0].callback({ rooms: [kitchen] });
+    await el.updateComplete;
+    const sensorsTab = [...el.shadowRoot!.querySelectorAll<HTMLElement>("[role=tab]")][3];
+    sensorsTab.click();
+    await el.updateComplete;
+    const content = el.shadowRoot!.querySelector("poltergeist-sensors") as HTMLElement & {
+      hass: Hass;
+    };
+    expect(content).not.toBeNull();
+    expect(content.hass).toBe(hass);
   });
 
   it("shows the five tabs and switches between them", async () => {

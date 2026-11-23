@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { formatCount, formatPercent } from "./format";
+import "./sensors-tab";
 import type { Hass, Room, RoomsMessage } from "./types";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
@@ -80,12 +81,23 @@ export class PoltergeistPanel extends LitElement {
           </button>`,
         )}
       </nav>
-      <main>${this._tab === "Overview" ? this._renderOverview() : this._renderEmpty()}</main>
+      <main>${this._renderTab()}</main>
     `;
   }
 
   private _toggleMenu = () =>
     this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
+
+  private _renderTab() {
+    switch (this._tab) {
+      case "Overview":
+        return this._renderOverview();
+      case "Sensors":
+        return html`<poltergeist-sensors .hass=${this.hass}></poltergeist-sensors>`;
+      default:
+        return this._renderEmpty();
+    }
+  }
 
   private _renderEmpty() {
     return html`<p class="note">Nothing here yet.</p>`;
@@ -98,19 +110,27 @@ export class PoltergeistPanel extends LitElement {
     if (!this._rooms) return html`<p class="note">Loading…</p>`;
     if (this._rooms.length === 0) {
       return html`<p class="note">
-        No rooms yet. Put a motion or occupancy sensor into an area and it appears here.
+        No rooms yet. Rooms are the areas of Home Assistant; create one and it appears here.
       </p>`;
     }
     return html`<div class="card">
-      ${this._rooms.map(
-        (room) => html`<div class="row">
-          <div class="name">${room.name}</div>
-          <div class="bar" title=${room.sensors.join(", ")}>
-            <div class="fill" style="width: ${Math.min(100, Math.max(0, room.probability))}%"></div>
-          </div>
-          <div class="value">${formatPercent(room.probability)}</div>
-          <div class="count">${formatCount(room.expected_count)}</div>
-        </div>`,
+      ${this._rooms.map((room) =>
+        room.probability === null
+          ? html`<div class="row">
+              <div class="name">${room.name}</div>
+              <div class="none">no sensors</div>
+            </div>`
+          : html`<div class="row">
+              <div class="name">${room.name}</div>
+              <div class="bar" title=${room.sensors.join(", ")}>
+                <div
+                  class="fill"
+                  style="width: ${Math.min(100, Math.max(0, room.probability))}%"
+                ></div>
+              </div>
+              <div class="value">${formatPercent(room.probability)}</div>
+              <div class="count">${formatCount(room.expected_count ?? 0)}</div>
+            </div>`,
       )}
     </div>`;
   }
@@ -208,6 +228,10 @@ export class PoltergeistPanel extends LitElement {
       text-align: right;
       color: var(--secondary-text-color);
       font-variant-numeric: tabular-nums;
+    }
+    .none {
+      grid-column: 2 / -1;
+      color: var(--secondary-text-color);
     }
     .note {
       color: var(--secondary-text-color);

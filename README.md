@@ -4,11 +4,12 @@ A Home Assistant custom integration that estimates where people are in the house
 
 ## What it does today (slice 01)
 
-- Every Home Assistant **area** that contains an enabled `binary_sensor` with device class `motion` or `occupancy` becomes a room. The sensor's own area wins, otherwise its device's area.
+- Every Home Assistant **area** is a room, with or without sensors. A room no sensor watches reports `unknown`.
+- Which sensor watches which room is stored (in `.storage/poltergeist`). The first time a sensor is seen, an enabled `binary_sensor` with device class `motion` or `occupancy` is put in the area Home Assistant has it in (its own area, otherwise its device's). After that the assignment is yours: change it, take a sensor out of every room, or add any other `binary_sensor` on the panel's Sensors tab. Moving a sensor to another area in Home Assistant later does not move it here; the tab shows when the two differ. Sensors deleted from Home Assistant are dropped.
 - Each room gets one device named *Occupancy* with two sensors: the occupancy probability in percent and the expected head count.
-- A motion sensor switching to `on` is evidence that someone is there; silence slowly argues for an empty room. Each room is filtered separately, in continuous time, over a head count of 0, 1, 2 or 3+. The default rates are priors, nothing is learned yet.
+- A motion sensor switching to `on` is evidence that someone is there; silence slowly argues for an empty room. Each room is filtered separately, in continuous time, over a head count of 0 up to a highest value (see below). The default rates are priors, nothing is learned yet.
 - The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down is not counted as silence, and neither is time while all of a room's sensors are unavailable.
-- An admin-only sidebar panel lists the rooms live. Its Map, People, Sensors and Health tabs are empty.
+- An admin-only sidebar panel lists the rooms live. The Sensors tab edits the assignments. Its Map, People and Health tabs are empty.
 
 The head count is tracked from 0 up to a highest value you can change under Settings > Devices & services > Poltergeist > Configure (default 4, range 1 to 15; the top count means "this many or more"). A motion sensor cannot tell these counts apart, so a higher value only matters once sensors that count people are added. Changing it reloads the integration and keeps the saved beliefs.
 

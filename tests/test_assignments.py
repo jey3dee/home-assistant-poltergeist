@@ -47,3 +47,20 @@ async def test_the_stored_map_is_not_modified(hass):
     reconcile_assignments(hass, stored)
     assert stored == {}
     assert pir not in stored
+
+
+async def test_reload_requests_are_merged_until_a_reload_has_started(hass):
+    from unittest.mock import patch
+
+    from custom_components.poltergeist.estimator import UpdateListeners
+    from tests.helpers import setup_poltergeist
+
+    await setup_poltergeist(hass)
+    listeners = UpdateListeners()
+    with patch.object(hass.config_entries, "async_schedule_reload") as schedule:
+        for _ in range(10):
+            listeners.request_reload(hass)
+        assert schedule.call_count == 1  # ten changes before the reload started: one reload
+        listeners.reload_started()
+        listeners.request_reload(hass)
+        assert schedule.call_count == 2  # a change after the reload began needs its own
