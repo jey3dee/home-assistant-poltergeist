@@ -10,8 +10,8 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import SAVE_DELAY, TICK_INTERVAL
-from .discovery import RoomSpec
+from .const import DOMAIN, SAVE_DELAY, TICK_INTERVAL
+from .discovery import Assignments, RoomSpec
 from .model import RoomBelief, RoomParams
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +29,18 @@ class UpdateListeners:
     def __init__(self) -> None:
         self._listeners: list[Callable[[], None]] = []
         self.estimator: Estimator | None = None
+        self._reload_requested = False
+
+    def request_reload(self, hass: HomeAssistant) -> None:
+        """Reload the entry once, however many changes arrive before it has started."""
+        if self._reload_requested:
+            return
+        self._reload_requested = True
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            hass.config_entries.async_schedule_reload(entry.entry_id)
+
+    def reload_started(self) -> None:
+        self._reload_requested = False
 
     def add(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
         self._listeners.append(listener)
@@ -54,12 +66,13 @@ class TrackedRoom:
             listener(now)
 
     @property
-    def probability(self) -> float:
-        return round(100.0 * self.belief.p_occupied, 1)
+    def probability(self) -> float | None:
+        """None for a room no sensor watches: there is nothing to say about it."""
+        return round(100.0 * self.belief.p_occupied, 1) if self.spec.sensors else None
 
     @property
-    def expected_count(self) -> float:
-        return round(self.belief.expected_count, 2)
+    def expected_count(self) -> float | None:
+        return round(self.belief.expected_count, 2) if self.spec.sensors else None
 
 
 class Estimator:
@@ -72,11 +85,13 @@ class Estimator:
         now: float,
         update_listeners: UpdateListeners,
         params: RoomParams,
+        assignments: Assignments,
     ):
         self.hass = hass
         self._store = store
         self._update_listeners = update_listeners
         self._params = params
+        self.assignments = assignments
         self.rooms: dict[str, TrackedRoom] = {}
         for area_id, spec in specs.items():
             if area_id in saved:
@@ -103,6 +118,9 @@ class Estimator:
                 )
             )
         return undo
+
+    def specs(self) -> dict[str, RoomSpec]:
+        return {area_id: room.spec for area_id, room in self.rooms.items()}
 
     def snapshot(self) -> list[dict]:
         return [
@@ -152,7 +170,10 @@ class Estimator:
         self._store.async_delay_save(self._stored_data, SAVE_DELAY)
 
     def _stored_data(self) -> dict:
-        return {"rooms": {a: r.belief.snapshot() for a, r in self.rooms.items()}}
+        return {
+            "rooms": {a: r.belief.snapshot() for a, r in self.rooms.items()},
+            "sensors": self.assignments,
+        }
 
     async def async_save(self) -> None:
         await self._store.async_save(self._stored_data())

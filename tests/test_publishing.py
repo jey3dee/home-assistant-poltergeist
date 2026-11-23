@@ -41,3 +41,17 @@ def test_mark_resets_the_reference():
     p.mark(0.0, 50.0)
     p.mark(10.0, 70.0)
     assert not p.due(20.0, 72.0)
+
+
+def test_a_value_that_appears_or_disappears_is_due_at_once():
+    p = make()
+    p.mark(100.0, None)
+    assert p.due(101.0, 20.0)
+    p.mark(101.0, 20.0)
+    assert p.due(102.0, None)
+
+
+def test_a_value_that_stays_absent_is_never_republished():
+    p = make()
+    p.mark(0.0, None)
+    assert not p.due(10_000.0, None)

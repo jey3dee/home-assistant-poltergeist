@@ -14,14 +14,16 @@ class Publisher:
         self._time: float | None = None
         self._value: float | None = None
 
-    def due(self, now: float, value: float) -> bool:
-        if self._time is None or self._value is None:
-            return True
+    def due(self, now: float, value: float | None) -> bool:
+        if self._time is None or (value is None) != (self._value is None):
+            return True  # first value, or the value appeared or disappeared
+        if value is None:
+            return False  # still no value: nothing to republish
         elapsed = now - self._time
         if elapsed < self.min_interval:
             return False
         return abs(value - self._value) >= self.step or elapsed >= self.heartbeat
 
-    def mark(self, now: float, value: float) -> None:
+    def mark(self, now: float, value: float | None) -> None:
         self._time = now
         self._value = value

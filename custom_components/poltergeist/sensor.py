@@ -16,7 +16,7 @@ from .publishing import Publisher
 
 @dataclass(frozen=True, kw_only=True)
 class RoomSensorDescription(SensorEntityDescription):
-    value_fn: Callable[[TrackedRoom], float]
+    value_fn: Callable[[TrackedRoom], float | None]
     step: float  # smallest change worth writing, in the sensor's own unit
 
 
@@ -68,7 +68,7 @@ class RoomSensor(SensorEntity):
         )
 
     @property
-    def native_value(self) -> float:
+    def native_value(self) -> float | None:
         return self.entity_description.value_fn(self._room)
 
     async def async_added_to_hass(self) -> None:

@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
@@ -54,26 +55,54 @@ async def test_removing_the_entry_removes_the_store_and_devices(hass, hass_stora
     assert dr.async_get(hass).async_get_devices(identifiers={(DOMAIN, kitchen.id)}) == []
 
 
-async def test_new_room_appears_after_a_sensor_is_placed(hass):
+async def test_a_room_without_sensors_exists_and_reports_unknown(hass):
+    kitchen = add_area(hass, "Kitchen")
+    add_area(hass, "Bedroom")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+    assert hass.states.get("sensor.bedroom_occupancy_probability").state == "unknown"
+    assert hass.states.get("sensor.bedroom_occupancy_expected_head_count").state == "unknown"
+    assert hass.states.get("sensor.kitchen_occupancy_probability").state != "unknown"
+
+
+async def test_a_room_gets_a_value_once_a_sensor_is_placed_in_it(hass):
     kitchen = add_area(hass, "Kitchen")
     hall = add_area(hass, "Hall")
     add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     await setup_poltergeist(hass)
-    assert hass.states.get("sensor.hall_occupancy_probability") is None
+    assert hass.states.get("sensor.hall_occupancy_probability").state == "unknown"
     add_binary_sensor(hass, "hall_pir", area_id=hall.id)
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.hall_occupancy_probability") is not None
+    assert float(hass.states.get("sensor.hall_occupancy_probability").state) > 0
 
 
-async def test_room_disappears_when_its_last_sensor_goes(hass):
+async def test_a_room_without_sensors_after_its_last_sensor_goes_reports_unknown(hass):
     kitchen = add_area(hass, "Kitchen")
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     await setup_poltergeist(hass)
-    assert hass.states.get("sensor.kitchen_occupancy_probability") is not None
+    assert hass.states.get("sensor.kitchen_occupancy_probability").state != "unknown"
     er.async_get(hass).async_remove(pir)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.kitchen_occupancy_probability").state == "unknown"
+
+
+async def test_a_room_disappears_with_its_area(hass):
+    kitchen = add_area(hass, "Kitchen")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+    assert hass.states.get("sensor.kitchen_occupancy_probability") is not None
+    ar.async_get(hass).async_delete(kitchen.id)
     await hass.async_block_till_done()
     assert er.async_get(hass).async_get("sensor.kitchen_occupancy_probability") is None
     assert dr.async_get(hass).async_get_devices(identifiers={(DOMAIN, kitchen.id)}) == []
+
+
+async def test_the_first_setup_stores_the_proposed_assignments(hass, hass_storage):
+    kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    add_binary_sensor(hass, "front_door", area_id=kitchen.id, device_class="door")
+    await setup_poltergeist(hass)
+    assert hass_storage[DOMAIN]["data"]["sensors"] == {pir: kitchen.id}
 
 
 async def test_setup_with_no_sensors_is_fine(hass):

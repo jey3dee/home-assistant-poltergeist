@@ -44,9 +44,17 @@ async def test_subscription_is_refused_for_non_admins(
     assert response["error"]["code"] == "unauthorized"
 
 
+async def _next_event_where(client, condition):
+    """The next pushed event that satisfies the condition; fails if none arrives in time."""
+    async with asyncio.timeout(3):  # without the fix nothing ever arrives
+        while True:
+            event = (await client.receive_json())["event"]
+            if condition(event):
+                return event
+
+
 async def test_subscription_survives_a_reload_of_the_entry(hass, hass_ws_client):
     kitchen = add_area(hass, "Kitchen")
-    hall = add_area(hass, "Hall")
     add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     await setup_poltergeist(hass)
     client = await hass_ws_client(hass)
@@ -54,14 +62,19 @@ async def test_subscription_survives_a_reload_of_the_entry(hass, hass_ws_client)
     await client.receive_json()
     assert len((await client.receive_json())["event"]["rooms"]) == 1
 
-    add_binary_sensor(hass, "hall_pir", area_id=hall.id)  # the entry reloads for the new room
+    hall = add_area(hass, "Hall")  # the entry reloads for the new room
+    hall_pir = add_binary_sensor(hass, "hall_pir", area_id=hall.id)
     await hass.async_block_till_done()
-    async with asyncio.timeout(3):  # without the fix nothing ever arrives
-        update = (await client.receive_json())["event"]
+    update = await _next_event_where(
+        client,
+        lambda e: any(r["name"] == "Hall" and r["probability"] is not None for r in e["rooms"]),
+    )
     assert sorted(r["name"] for r in update["rooms"]) == ["Hall", "Kitchen"]
 
-    hass.states.async_set("binary_sensor.hall_pir", "on")  # and the new estimator keeps feeding it
+    hass.states.async_set(hall_pir, "on")  # and the new estimator keeps feeding it
     await hass.async_block_till_done()
-    async with asyncio.timeout(3):
-        update = (await client.receive_json())["event"]
-    assert next(r for r in update["rooms"] if r["name"] == "Hall")["probability"] > 99.0
+    update = await _next_event_where(
+        client,
+        lambda e: any(r["name"] == "Hall" and (r["probability"] or 0) > 99.0 for r in e["rooms"]),
+    )
+    assert update
