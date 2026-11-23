@@ -6,6 +6,7 @@ from homeassistant.config_entries import (
     OptionsFlowWithReload,
 )
 from homeassistant.core import callback
+from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig, NumberSelectorMode
 
 from .const import CONF_MAX_PEOPLE, DEFAULT_MAX_PEOPLE, DOMAIN
 from .model import MAX_PEOPLE_LIMIT
@@ -36,7 +37,12 @@ class PoltergeistOptionsFlow(OptionsFlowWithReload):
         schema = vol.Schema(
             {
                 vol.Required(CONF_MAX_PEOPLE, default=current): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=MAX_PEOPLE_LIMIT)
+                    NumberSelector(
+                        NumberSelectorConfig(
+                            min=1, max=MAX_PEOPLE_LIMIT, step=1, mode=NumberSelectorMode.BOX
+                        )
+                    ),
+                    vol.Coerce(int),
                 )
             }
         )

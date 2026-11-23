@@ -51,3 +51,15 @@ async def test_options_flow_refuses_values_outside_the_checked_range(hass, bad):
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(result["flow_id"], {"max_people": bad})
     assert entry.options == {}
+
+
+async def test_options_form_uses_a_number_box_and_stores_a_whole_number(hass):
+    entry = await setup_poltergeist(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    selector = result["data_schema"].schema["max_people"].validators[0]
+    assert selector.config["mode"] == "box"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"max_people": 6.0}
+    )
+    assert entry.options == {"max_people": 6}
+    assert type(entry.options["max_people"]) is int
