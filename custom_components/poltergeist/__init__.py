@@ -22,7 +22,7 @@ from .const import (
     STORE_VERSION,
     UPDATE_LISTENERS_KEY,
 )
-from .discovery import RoomSpec, build_rooms, reconcile_assignments
+from .discovery import RoomSpec, apply_room_sync, build_rooms, plan_room_sync
 from .estimator import Estimator, UpdateListeners
 from .model import RoomParams
 
@@ -43,27 +43,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     listeners: UpdateListeners = hass.data[UPDATE_LISTENERS_KEY]
     listeners.reload_started()  # changes from here on are not covered by this setup
 
-    store: Store = Store(hass, STORE_VERSION, STORE_KEY)
-    data = await store.async_load() or {}
-    saved = data.get("rooms", {})
-    assignments = reconcile_assignments(hass, data.get("sensors", {}))
-    specs = build_rooms(hass, assignments)
-    _remove_stale_devices(hass, entry, specs)
+    apply_room_sync(hass, entry, plan_room_sync(hass, entry))
+    specs = build_rooms(hass, entry)
 
+    store: Store = Store(hass, STORE_VERSION, STORE_KEY)
+    saved = (await store.async_load() or {}).get("rooms", {})
     params = RoomParams(max_people=entry.options.get(CONF_MAX_PEOPLE, DEFAULT_MAX_PEOPLE))
     estimator = Estimator(
-        hass, specs, store, saved, dt_util.utcnow().timestamp(), listeners, params, assignments
+        hass, specs, store, saved, dt_util.utcnow().timestamp(), listeners, params
     )
     entry.runtime_data = estimator
     # Watch from here on: a change made while the rest of the setup awaits must not be missed.
-    entry.async_on_unload(_watch_registries(hass, listeners, estimator))
+    entry.async_on_unload(_watch_registries(hass, entry, listeners, estimator))
+    entry.async_on_unload(entry.add_update_listener(_reload_on_change))
     _LOGGER.info(
         "Restored the belief of %d of %d rooms from the store",
         len(saved.keys() & specs.keys()),
         len(specs),
     )
-    if assignments != data.get("sensors"):
-        await estimator.async_save()  # the first run, or sensors that were added or removed
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     for undo in estimator.async_start():
@@ -82,6 +79,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     return True
 
 
+async def _reload_on_change(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Options, rooms and their sensors all take effect by reloading, once per burst."""
+    hass.data[UPDATE_LISTENERS_KEY].request_reload(hass)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
@@ -97,18 +99,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry)
     await Store(hass, STORE_VERSION, STORE_KEY).async_remove()
 
 
-def _remove_stale_devices(
-    hass: HomeAssistant, entry: ConfigEntry, specs: dict[str, RoomSpec]
-) -> None:
-    registry = dr.async_get(hass)
-    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
-        area_ids = {identifier[1] for identifier in device.identifiers if identifier[0] == DOMAIN}
-        if not area_ids & specs.keys():
-            registry.async_remove_device(device.id)
-
-
-def _watch_registries(hass: HomeAssistant, listeners: UpdateListeners, estimator: Estimator):
-    """Reload when the rooms or the assignments Home Assistant would add change."""
+def _watch_registries(
+    hass: HomeAssistant, entry: ConfigEntry, listeners: UpdateListeners, estimator: Estimator
+):
+    """Reload when Home Assistant changes something the rooms are built from."""
 
     def fingerprint(rooms: dict[str, RoomSpec]) -> dict:
         return {a: (r.name, sorted(r.sensors)) for a, r in rooms.items()}
@@ -117,11 +111,9 @@ def _watch_registries(hass: HomeAssistant, listeners: UpdateListeners, estimator
 
     @callback
     def changed(_event: Event) -> None:
-        # Stored assignments win, so only new sensors, deleted ones and room changes show up here.
-        assignments = reconcile_assignments(hass, estimator.assignments)
         if (
-            assignments != estimator.assignments
-            or fingerprint(build_rooms(hass, assignments)) != current
+            plan_room_sync(hass, entry).changes_rooms
+            or fingerprint(build_rooms(hass, entry)) != current
         ):
             _LOGGER.info("Rooms or sensors changed, reloading")
             listeners.request_reload(hass)

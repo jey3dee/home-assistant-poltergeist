@@ -11,7 +11,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, SAVE_DELAY, TICK_INTERVAL
-from .discovery import Assignments, RoomSpec
+from .discovery import RoomSpec
 from .model import RoomBelief, RoomParams
 
 _LOGGER = logging.getLogger(__name__)
@@ -85,13 +85,11 @@ class Estimator:
         now: float,
         update_listeners: UpdateListeners,
         params: RoomParams,
-        assignments: Assignments,
     ):
         self.hass = hass
         self._store = store
         self._update_listeners = update_listeners
         self._params = params
-        self.assignments = assignments
         self.rooms: dict[str, TrackedRoom] = {}
         for area_id, spec in specs.items():
             if area_id in saved:
@@ -170,10 +168,7 @@ class Estimator:
         self._store.async_delay_save(self._stored_data, SAVE_DELAY)
 
     def _stored_data(self) -> dict:
-        return {
-            "rooms": {a: r.belief.snapshot() for a, r in self.rooms.items()},
-            "sensors": self.assignments,
-        }
+        return {"rooms": {a: r.belief.snapshot() for a, r in self.rooms.items()}}
 
     async def async_save(self) -> None:
         await self._store.async_save(self._stored_data())

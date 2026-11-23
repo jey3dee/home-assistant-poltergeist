@@ -1,11 +1,15 @@
+from types import MappingProxyType
+
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.poltergeist.const import DOMAIN
+from custom_components.poltergeist.const import CONF_SENSORS, DOMAIN, SUBENTRY_ROOM
+from custom_components.poltergeist.discovery import apply_room_sync, plan_room_sync
 
 
 def add_area(hass: HomeAssistant, name: str):
@@ -58,3 +62,37 @@ async def setup_poltergeist(hass: HomeAssistant) -> MockConfigEntry:
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry
+
+
+def add_entry(hass: HomeAssistant, **kwargs) -> MockConfigEntry:
+    """A Poltergeist entry that is not set up, to test the room logic on its own."""
+    entry = MockConfigEntry(domain=DOMAIN, title="Poltergeist", **kwargs)
+    entry.add_to_hass(hass)
+    return entry
+
+
+def sync(hass: HomeAssistant, entry: MockConfigEntry):
+    plan = plan_room_sync(hass, entry)
+    apply_room_sync(hass, entry, plan)
+    return plan
+
+
+def room(entry: MockConfigEntry, area_id: str) -> ConfigSubentry | None:
+    return next((s for s in entry.subentries.values() if s.unique_id == area_id), None)
+
+
+def room_sensors(entry: MockConfigEntry, area_id: str) -> list[str] | None:
+    found = room(entry, area_id)
+    return None if found is None else list(found.data[CONF_SENSORS])
+
+
+def add_room(hass: HomeAssistant, entry: MockConfigEntry, area, sensors=()):
+    hass.config_entries.async_add_subentry(
+        entry,
+        ConfigSubentry(
+            data=MappingProxyType({CONF_SENSORS: list(sensors)}),
+            subentry_type=SUBENTRY_ROOM,
+            title=area.name,
+            unique_id=area.id,
+        ),
+    )

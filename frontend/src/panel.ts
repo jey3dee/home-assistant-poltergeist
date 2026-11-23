@@ -1,6 +1,5 @@
 import { LitElement, css, html, nothing } from "lit";
 import { formatCount, formatPercent } from "./format";
-import "./sensors-tab";
 import type { Hass, Room, RoomsMessage } from "./types";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
@@ -81,23 +80,12 @@ export class PoltergeistPanel extends LitElement {
           </button>`,
         )}
       </nav>
-      <main>${this._renderTab()}</main>
+      <main>${this._tab === "Overview" ? this._renderOverview() : this._renderEmpty()}</main>
     `;
   }
 
   private _toggleMenu = () =>
     this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
-
-  private _renderTab() {
-    switch (this._tab) {
-      case "Overview":
-        return this._renderOverview();
-      case "Sensors":
-        return html`<poltergeist-sensors .hass=${this.hass}></poltergeist-sensors>`;
-      default:
-        return this._renderEmpty();
-    }
-  }
 
   private _renderEmpty() {
     return html`<p class="note">Nothing here yet.</p>`;
@@ -110,7 +98,7 @@ export class PoltergeistPanel extends LitElement {
     if (!this._rooms) return html`<p class="note">Loading…</p>`;
     if (this._rooms.length === 0) {
       return html`<p class="note">
-        No rooms yet. Rooms are the areas of Home Assistant; create one and it appears here.
+        No rooms yet. Add one under Settings > Devices & services > Poltergeist.
       </p>`;
     }
     return html`<div class="card">

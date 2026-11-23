@@ -1,5 +1,10 @@
 DOMAIN = "poltergeist"
 
+SUBENTRY_ROOM = "room"
+CONF_SENSORS = "sensors"  # in a room: the entity ids of the sensors that watch it
+CONF_SEEN_AREAS = "seen_areas"  # areas already offered as rooms, so a deleted room stays deleted
+CONF_SEEN_SENSORS = "seen_sensors"  # sensors already offered, so a removed one stays removed
+
 CONF_MAX_PEOPLE = "max_people"
 DEFAULT_MAX_PEOPLE = 4
 

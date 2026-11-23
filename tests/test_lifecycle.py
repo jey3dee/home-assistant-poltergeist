@@ -9,7 +9,7 @@ from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.poltergeist.const import DOMAIN
 
-from .helpers import add_area, add_binary_sensor, setup_poltergeist
+from .helpers import add_area, add_binary_sensor, room, room_sensors, setup_poltergeist
 
 
 async def test_beliefs_survive_a_restart(hass, hass_storage):
@@ -97,12 +97,45 @@ async def test_a_room_disappears_with_its_area(hass):
     assert dr.async_get(hass).async_get_devices(identifiers={(DOMAIN, kitchen.id)}) == []
 
 
-async def test_the_first_setup_stores_the_proposed_assignments(hass, hass_storage):
+async def test_the_first_setup_makes_a_room_entry_of_every_area(hass, hass_storage):
     kitchen = add_area(hass, "Kitchen")
+    bedroom = add_area(hass, "Bedroom")
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     add_binary_sensor(hass, "front_door", area_id=kitchen.id, device_class="door")
-    await setup_poltergeist(hass)
-    assert hass_storage[DOMAIN]["data"]["sensors"] == {pir: kitchen.id}
+    entry = await setup_poltergeist(hass)
+    assert room_sensors(entry, kitchen.id) == [pir]
+    assert room_sensors(entry, bedroom.id) == []
+    assert {s.title for s in entry.subentries.values()} == {"Kitchen", "Bedroom"}
+    await hass.config_entries.async_unload(entry.entry_id)
+    assert set(hass_storage[DOMAIN]["data"]) == {"rooms"}  # the store holds beliefs only
+
+
+async def test_a_rooms_entities_belong_to_its_room_entry(hass):
+    kitchen = add_area(hass, "Kitchen")
+    entry = await setup_poltergeist(hass)
+    registry = er.async_get(hass)
+    entity = registry.async_get("sensor.kitchen_occupancy_probability")
+    assert entity.config_subentry_id == room(entry, kitchen.id).subentry_id
+    device = dr.async_get(hass).async_get(entity.device_id)
+    assert device.config_subentry_id == room(entry, kitchen.id).subentry_id
+
+
+async def test_deleting_a_room_removes_its_entities_and_it_stays_deleted(hass):
+    kitchen = add_area(hass, "Kitchen")
+    add_area(hass, "Hall")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    entry = await setup_poltergeist(hass)
+    hass.config_entries.async_remove_subentry(entry, room(entry, kitchen.id).subentry_id)
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get("sensor.kitchen_occupancy_probability") is None
+    assert dr.async_get(hass).async_get_devices(identifiers={(DOMAIN, kitchen.id)}) == []
+    assert "Kitchen" not in [r.spec.name for r in entry.runtime_data.rooms.values()]
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert room(entry, kitchen.id) is None
+    assert er.async_get(hass).async_get("sensor.kitchen_occupancy_probability") is None
+    assert hass.states.get("sensor.hall_occupancy_probability") is not None
 
 
 async def test_setup_with_no_sensors_is_fine(hass):

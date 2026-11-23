@@ -44,11 +44,11 @@ async def async_setup_entry(
     entry: PoltergeistConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities(
-        RoomSensor(room, description)
-        for room in entry.runtime_data.rooms.values()
-        for description in DESCRIPTIONS
-    )
+    for room in entry.runtime_data.rooms.values():
+        async_add_entities(
+            [RoomSensor(room, description) for description in DESCRIPTIONS],
+            config_subentry_id=room.spec.subentry_id,
+        )
 
 
 class RoomSensor(SensorEntity):
