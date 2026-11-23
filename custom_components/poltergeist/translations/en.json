@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Poltergeist",
+        "description": "Estimate where people are in the house from motion sensors that are assigned to areas. Nothing needs to be configured here."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Poltergeist is already set up."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "occupancy_probability": { "name": "Probability" },
+      "expected_head_count": { "name": "Expected head count" }
+    }
+  }
+}

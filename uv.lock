@@ -1694,6 +1694,15 @@ wheels = [
 ]
 
 [[package]]
+name = "home-assistant-frontend"
+version = "20260930.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c1/0d/e8bf54c2ef163a668b9dbcf1cfff9d4aba4a07c576b12f89b5f43ec9c7c1/home_assistant_frontend-20260930.5.tar.gz", hash = "sha256:e336712f66687f5b3e0643fdd31bdf4b946b47f08f7f94d9f9e599a40df29473", size = 109917155, upload-time = "2026-10-23T13:24:22.127Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/d1/e02a835dd5840c5219c4934db265e395a661a7882e0b68c96c1589d3c2d2/home_assistant_frontend-20260930.5-py3-none-any.whl", hash = "sha256:9cc03b3d2a43e93c6e57cc20b322c98cce61be7a35d7c1df1021e279d22d1f9b", size = 110686791, upload-time = "2026-10-23T13:24:17.338Z" },
+]
+
+[[package]]
 name = "homeassistant"
 version = "2026.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2675,6 +2684,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "home-assistant-frontend" },
     { name = "pytest-homeassistant-custom-component", version = "0.13.316", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14.2'" },
     { name = "pytest-homeassistant-custom-component", version = "0.13.375", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14.2'" },
     { name = "ruff" },
@@ -2684,6 +2694,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "home-assistant-frontend", specifier = "==20260930.5" },
     { name = "pytest-homeassistant-custom-component" },
     { name = "ruff" },
 ]
