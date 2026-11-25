@@ -1,6 +1,5 @@
 """The rooms of the integration: one room entry per area, filled with proposals, then the user's."""
 
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 
