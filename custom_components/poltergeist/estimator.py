@@ -33,6 +33,11 @@ def _value(state: State | None) -> bool | None:
     return None if state is None else _VALUES.get(state.state)
 
 
+def _word(value: bool | None) -> str:
+    """A sensor value as the log says it."""
+    return "unavailable" if value is None else (STATE_ON if value else STATE_OFF)
+
+
 class UpdateListeners:
     """Who wants to hear that room values changed, and which estimator is current.
 
@@ -45,11 +50,12 @@ class UpdateListeners:
         self.estimator: Estimator | None = None
         self._reload_requested = False
 
-    def request_reload(self, hass: HomeAssistant) -> None:
+    def request_reload(self, hass: HomeAssistant, reason: str) -> None:
         """Reload the entry once, however many changes arrive before it has started."""
         if self._reload_requested:
             return
         self._reload_requested = True
+        _LOGGER.info("%s, reloading", reason)
         for entry in hass.config_entries.async_entries(DOMAIN):
             hass.config_entries.async_schedule_reload(entry.entry_id)
 
@@ -118,11 +124,11 @@ class Estimator:
         self.rooms: dict[str, TrackedRoom] = {}
         for area_id, spec in specs.items():
             if area_id in saved:
-                belief = RoomBelief.from_snapshot(self._params, saved[area_id])
+                belief = RoomBelief.from_snapshot(self._params, saved[area_id], spec.name)
                 # Nobody watched while Home Assistant was down, so that gap is not silence.
                 belief.advance(belief.latest(now))
             else:
-                belief = RoomBelief(self._params, t=now)
+                belief = RoomBelief(self._params, t=now, name=spec.name)
             self.rooms[area_id] = TrackedRoom(spec, belief)
         self._room_of_sensor = {
             sensor: room for room in self.rooms.values() for sensor in room.spec.sensors
@@ -171,9 +177,18 @@ class Estimator:
         if new == old:
             return  # only attributes changed, or it is still not heard
         room.advance(event.time_fired.timestamp())  # with the sensors as they were until now
+        before = room.belief.p_occupied
         room.belief.observe_change(room.spec.kinds[entity_id], old, new)
         room.states[entity_id] = new
-        _LOGGER.debug("%s in %s went from %s to %s", entity_id, room.spec.name, old, new)
+        _LOGGER.debug(
+            "%s: %s went from %s to %s; occupied %.1f %% before, %.1f %% after",
+            room.spec.name,
+            entity_id,
+            _word(old),
+            _word(new),
+            100.0 * before,
+            100.0 * room.belief.p_occupied,
+        )
         self._after_change(room)
 
     @callback

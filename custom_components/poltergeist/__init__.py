@@ -49,6 +49,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     apply_room_sync(hass, entry, plan_room_sync(hass, entry))
     specs = build_rooms(hass, entry)
     for spec in specs.values():
+        watched = ", ".join(f"{sensor} ({kind})" for sensor, kind in spec.kinds.items())
+        _LOGGER.debug("%s watches %s", spec.name, watched or "no sensors")
         if spec.ignored:
             _LOGGER.warning(
                 "%s: not watching %s. Only motion and occupancy sensors can be used so far",
@@ -91,7 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
 
 async def _reload_on_change(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Options, rooms and their sensors all take effect by reloading, once per burst."""
-    hass.data[UPDATE_LISTENERS_KEY].request_reload(hass)
+    hass.data[UPDATE_LISTENERS_KEY].request_reload(hass, "Settings or rooms were saved")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) -> bool:
@@ -125,8 +127,7 @@ def _watch_registries(
             plan_room_sync(hass, entry).changes_rooms
             or fingerprint(build_rooms(hass, entry)) != current
         ):
-            _LOGGER.info("Rooms or sensors changed, reloading")
-            listeners.request_reload(hass)
+            listeners.request_reload(hass, "Rooms or sensors changed in Home Assistant")
 
     undo = [
         hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, changed),

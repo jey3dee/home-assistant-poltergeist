@@ -212,10 +212,10 @@ async def test_reload_requests_are_merged_until_a_reload_has_started(hass):
     listeners = UpdateListeners()
     with patch.object(hass.config_entries, "async_schedule_reload") as schedule:
         for _ in range(10):
-            listeners.request_reload(hass)
+            listeners.request_reload(hass, "changed")
         assert schedule.call_count == 1  # ten changes before the reload started: one reload
         listeners.reload_started()
-        listeners.request_reload(hass)
+        listeners.request_reload(hass, "changed")
         assert schedule.call_count == 2  # a change after the reload began needs its own
 
 

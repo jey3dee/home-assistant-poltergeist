@@ -142,8 +142,11 @@ class _Propagator:
 
 
 class RoomBelief:
-    def __init__(self, params: RoomParams, probabilities=None, t: float | None = None):
+    def __init__(
+        self, params: RoomParams, probabilities=None, t: float | None = None, name: str = "A room"
+    ):
         self.params = params
+        self.name = name  # only for the log
         # Rows are the "from" state, so a belief row vector moves as `belief @ propagator`.
         # One propagator per combination of dwell rates, made when it is first needed.
         self._propagators: dict[bytes, _Propagator] = {}
@@ -211,7 +214,8 @@ class RoomBelief:
         total = vector.sum()
         if not np.isfinite(total) or total <= 0.0:
             _LOGGER.warning(
-                "The observations are impossible under the model; the room estimate is reset"
+                "%s: the observations are impossible under the model; the estimate is reset",
+                self.name,
             )
             return self._stationary()
         return vector / total
@@ -220,7 +224,7 @@ class RoomBelief:
         return {"probabilities": [float(p) for p in self.probabilities], "t": self.t}
 
     @classmethod
-    def from_snapshot(cls, params: RoomParams, data: dict) -> RoomBelief:
+    def from_snapshot(cls, params: RoomParams, data: dict, name: str = "A room") -> RoomBelief:
         stored = np.asarray(data["probabilities"], float)
         n = params.n_states
         # The room size may have changed since the belief was saved: widen with zeros, or fold the
@@ -229,4 +233,4 @@ class RoomBelief:
         fitted[: min(n, len(stored))] = stored[:n]
         if len(stored) > n:
             fitted[n - 1] += stored[n:].sum()
-        return cls(params, probabilities=fitted, t=data["t"])
+        return cls(params, probabilities=fitted, t=data["t"], name=name)
