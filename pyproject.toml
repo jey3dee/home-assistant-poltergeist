@@ -2,16 +2,24 @@
 name = "poltergeist"
 version = "0.1.0"
 description = "Probabilistic presence tracking for Home Assistant"
-requires-python = ">=3.14"
+requires-python = ">=3.14.2"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest-homeassistant-custom-component", "ruff", "home-assistant-frontend==20260930.5"]
+# The one Home Assistant version we develop and test against. When it changes, change the
+# override below, the frontend it asks for and the minimum in hacs.json with it.
+dev = [
+    "homeassistant==2026.11.3",
+    "home-assistant-frontend==20261028.8",
+    "pytest-homeassistant-custom-component==0.13.375",
+    "ruff",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "-p tests.ha_compat"
 
 [tool.ruff]
 line-length = 100
@@ -19,3 +27,7 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.uv]
+# The harness requires an older Home Assistant; see tests/ha_compat.py.
+override-dependencies = ["homeassistant==2026.11.3"]

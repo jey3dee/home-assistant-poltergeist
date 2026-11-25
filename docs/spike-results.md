@@ -35,3 +35,5 @@ This is the independent-room model of this slice only. It says nothing about the
 ## Test harness gap
 
 `pytest-homeassistant-custom-component` (latest 0.13.375, 2026-10-25) pins `homeassistant==2026.10.4`. Installing 2026.11.2 next to it fails at import (`httpx was already imported`). The automated tests therefore run against 2026.10.4, and the runtime checks above against 2026.11.2. `hacs.json` names 2026.11.0 as the minimum, which the unit tests do not exercise.
+
+**Later (2026-11-25):** the tests now run on 2026.11.3. The import error came from the harness loading `respx`, and with it `httpx`, before Home Assistant could substitute `httpx2`. `tests/ha_compat.py` handles that and one function the harness imports from its old place. The section above describes the state when slice 01 was first run.

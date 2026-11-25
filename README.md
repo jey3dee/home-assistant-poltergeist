@@ -24,7 +24,7 @@ Not there yet: persons, other sensor kinds, learning, movement between rooms, th
 
 ## Install by hand
 
-Requires Home Assistant 2026.11 or newer.
+Requires Home Assistant 2026.11.3 or newer. Development and the automated tests use exactly 2026.11.3; newer versions are not tested until the pin moves.
 
 1. Build the panel (see below). `custom_components/poltergeist/panel.js` is committed, so this is only needed after changing the front end.
 2. Copy `custom_components/poltergeist` into the `custom_components` folder of your Home Assistant configuration and restart Home Assistant.
@@ -35,7 +35,7 @@ Put your motion and occupancy sensors into areas first; rooms follow the registr
 ## Develop
 
 ```sh
-uv sync                      # Python 3.14 and the Home Assistant test tools
+uv sync                      # Python 3.14.2 or newer and the Home Assistant test tools
 uv run pytest                # model, oracle comparison and integration tests
 uv run ruff check .
 uv run ruff format --check .
@@ -49,15 +49,21 @@ npm run build                # writes ../custom_components/poltergeist/panel.js
 
 The model is checked against an independent reference, a discrete-time forward pass in `tests/oracle.py`, on households simulated by `tests/simulator.py`.
 
+### The Home Assistant version
+
+`pyproject.toml` pins Home Assistant. The test harness, `pytest-homeassistant-custom-component`, declares an older one, so `uv` is told to override it and `tests/ha_compat.py` bridges the two differences. This is not a combination the harness supports.
+
+To move to a new release, change the two `homeassistant==` pins and the frontend pin in `pyproject.toml` (the frontend version is in Home Assistant's `components/frontend/manifest.json`) and the minimum in `hacs.json`, then run `uv lock`, `uv sync` and the tests. `tests/test_versions.py` fails if the stated minimum or the frontend does not match. Drop the override and `tests/ha_compat.py` once the harness supports the pinned release.
+
 ### Try it in a throwaway Home Assistant
 
-The automated tests use `pytest-homeassistant-custom-component`, which currently pins Home Assistant 2026.10.4. To try the integration on a current release, run the official image with a scratch configuration directory and the integration mounted:
+Run the official image of the pinned release with a scratch configuration directory and the integration mounted:
 
 ```sh
 docker run -d --name poltergeist-dev -p 18123:8123 \
   -v "$PWD/dev-config:/config" \
   -v "$PWD/custom_components/poltergeist:/config/custom_components/poltergeist:ro" \
-  ghcr.io/home-assistant/home-assistant:2026.11.2
+  ghcr.io/home-assistant/home-assistant:2026.11.3
 ```
 
 `dev-config/` is ignored by git. Results of the first runs against 2026.11.2 are in `docs/spike-results.md`.
