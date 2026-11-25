@@ -82,7 +82,7 @@ async def test_add_says_so_when_every_area_is_a_room(hass):
     assert result["reason"] == "all_areas_are_rooms"
 
 
-async def test_configure_shows_the_sensors_of_the_room_and_offers_any_binary_sensor(hass):
+async def test_configure_shows_the_rooms_sensors_and_offers_motion_and_occupancy_only(hass):
     kitchen = add_area(hass, "Kitchen")
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     entry = await setup_poltergeist(hass)
@@ -90,27 +90,26 @@ async def test_configure_shows_the_sensors_of_the_room_and_offers_any_binary_sen
     assert result["type"] is FlowResultType.FORM
     schema = result["data_schema"]
     assert schema({})["sensors"] == [pir]
-    selector = (
-        schema.schema["sensors"].config if hasattr(schema.schema["sensors"], "config") else None
-    )
-    assert selector is not None and selector["domain"] == ["binary_sensor"]
+    [offered] = schema.schema["sensors"].config["filter"]
+    assert offered["domain"] == ["binary_sensor"]
+    assert sorted(offered["device_class"]) == ["motion", "occupancy"]
     assert result["description_placeholders"] == {"room": "Kitchen"}
 
 
 async def test_configure_saves_the_sensors_and_the_room_watches_them_after_the_reload(hass):
     kitchen = add_area(hass, "Kitchen")
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
-    door = add_binary_sensor(hass, "front_door", device_class="door")
+    radar = add_binary_sensor(hass, "radar", device_class="occupancy")
     entry = await setup_poltergeist(hass)
     result = await start_configure(hass, entry, kitchen.id)
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"sensors": [pir, door]}
+        result["flow_id"], {"sensors": [pir, radar]}
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     await hass.async_block_till_done()
-    assert room_sensors(entry, kitchen.id) == [pir, door]
-    assert entry.runtime_data.rooms[kitchen.id].spec.sensors == [pir, door]
+    assert room_sensors(entry, kitchen.id) == [pir, radar]
+    assert entry.runtime_data.rooms[kitchen.id].spec.sensors == [pir, radar]
 
 
 async def test_choosing_a_sensor_of_another_room_moves_it(hass):

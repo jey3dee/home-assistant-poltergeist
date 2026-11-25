@@ -45,6 +45,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
 
     apply_room_sync(hass, entry, plan_room_sync(hass, entry))
     specs = build_rooms(hass, entry)
+    for spec in specs.values():
+        if spec.ignored:
+            _LOGGER.warning(
+                "%s: not watching %s. Only motion and occupancy sensors can be used so far",
+                spec.name,
+                ", ".join(spec.ignored),
+            )
 
     store: Store = Store(hass, STORE_VERSION, STORE_KEY)
     saved = (await store.async_load() or {}).get("rooms", {})
@@ -105,7 +112,7 @@ def _watch_registries(
     """Reload when Home Assistant changes something the rooms are built from."""
 
     def fingerprint(rooms: dict[str, RoomSpec]) -> dict:
-        return {a: (r.name, sorted(r.sensors)) for a, r in rooms.items()}
+        return {a: (r.name, sorted(r.kinds.items())) for a, r in rooms.items()}
 
     current = fingerprint(estimator.specs())
 

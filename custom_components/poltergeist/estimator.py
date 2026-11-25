@@ -1,22 +1,36 @@
-"""Holds one belief per room, feeds it with motion events and tells listeners about changes."""
+"""Holds one belief per room, feeds it with what its sensors do and tells listeners about it."""
 
 import logging
 from collections.abc import Callable
 from datetime import timedelta
 
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.const import STATE_OFF, STATE_ON
+from homeassistant.core import (
+    CALLBACK_TYPE,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+)
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, SAVE_DELAY, TICK_INTERVAL
 from .discovery import RoomSpec
-from .model import RoomBelief, RoomParams
+from .model import Reading, RoomBelief, RoomParams
 
 _LOGGER = logging.getLogger(__name__)
 
 Listener = Callable[[float], None]
+
+_VALUES = {STATE_ON: True, STATE_OFF: False}
+
+
+def _value(state: State | None) -> bool | None:
+    """On, off, or None when the sensor is not heard (missing, unavailable, unknown)."""
+    return None if state is None else _VALUES.get(state.state)
 
 
 class UpdateListeners:
@@ -55,7 +69,17 @@ class TrackedRoom:
     def __init__(self, spec: RoomSpec, belief: RoomBelief):
         self.spec = spec
         self.belief = belief
+        # What each sensor has said last. Nothing is heard until the estimator starts listening.
+        self.states: dict[str, bool | None] = dict.fromkeys(spec.kinds)
         self._listeners: list[Listener] = []
+
+    def readings(self) -> list[Reading]:
+        return [(kind, self.states[entity_id]) for entity_id, kind in self.spec.kinds.items()]
+
+    def advance(self, t: float) -> None:
+        """Move the belief to t, with the sensors as they have been since the last step."""
+        # The tick may have advanced the belief a few milliseconds past an event's own timestamp.
+        self.belief.advance(self.belief.latest(t), self.readings())
 
     def add_listener(self, listener: Listener) -> CALLBACK_TYPE:
         self._listeners.append(listener)
@@ -95,7 +119,7 @@ class Estimator:
             if area_id in saved:
                 belief = RoomBelief.from_snapshot(self._params, saved[area_id])
                 # Nobody watched while Home Assistant was down, so that gap is not silence.
-                belief.advance(belief.latest(now), observed=False)
+                belief.advance(belief.latest(now))
             else:
                 belief = RoomBelief(self._params, t=now)
             self.rooms[area_id] = TrackedRoom(spec, belief)
@@ -106,6 +130,12 @@ class Estimator:
     @callback
     def async_start(self) -> list[CALLBACK_TYPE]:
         """Begin listening. Returns the callbacks that undo it."""
+        now = dt_util.utcnow().timestamp()
+        for room in self.rooms.values():
+            room.advance(now)  # nothing was heard until now
+            # How a sensor stands when first seen is no change; from here on it is listened to.
+            for entity_id in room.states:
+                room.states[entity_id] = _value(self.hass.states.get(entity_id))
         undo = [
             async_track_time_interval(self.hass, self._tick, timedelta(seconds=TICK_INTERVAL)),
         ]
@@ -134,33 +164,24 @@ class Estimator:
 
     @callback
     def _handle_state_change(self, event: Event[EventStateChangedData]) -> None:
-        new, old = event.data["new_state"], event.data["old_state"]
-        if new is None or new.state != "on":
-            return
-        if old is not None and old.state == "on":
-            return  # attribute change only, the sensor did not fire again
-        room = self._room_of_sensor[event.data["entity_id"]]
-        # The tick may have advanced the belief a few milliseconds past the event's own timestamp.
-        room.belief.observe_event(room.belief.latest(event.time_fired.timestamp()))
-        _LOGGER.debug("Motion in %s from %s", room.spec.name, event.data["entity_id"])
+        entity_id = event.data["entity_id"]
+        room = self._room_of_sensor[entity_id]
+        old, new = room.states[entity_id], _value(event.data["new_state"])
+        if new == old:
+            return  # only attributes changed, or it is still not heard
+        room.advance(event.time_fired.timestamp())  # with the sensors as they were until now
+        room.belief.observe_change(room.spec.kinds[entity_id], old, new)
+        room.states[entity_id] = new
+        _LOGGER.debug("%s in %s went from %s to %s", entity_id, room.spec.name, old, new)
         self._after_change(room)
 
     @callback
     def _tick(self, _now) -> None:
         now = dt_util.utcnow().timestamp()
         for room in self.rooms.values():
-            # A sensor that is unavailable says nothing, so silence is only evidence while at
-            # least one of the room's sensors is actually reporting.
-            room.belief.advance(room.belief.latest(now), observed=self._is_reporting(room))
+            room.advance(now)
             room.notify(now)
         self._update_listeners.notify()
-
-    def _is_reporting(self, room: TrackedRoom) -> bool:
-        for entity_id in room.spec.sensors:
-            state = self.hass.states.get(entity_id)
-            if state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-                return True
-        return False
 
     def _after_change(self, room: TrackedRoom) -> None:
         room.notify(dt_util.utcnow().timestamp())

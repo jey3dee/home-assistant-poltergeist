@@ -16,8 +16,13 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_SEEN_AREAS, CONF_SEEN_SENSORS, CONF_SENSORS, SUBENTRY_ROOM
+from .model import SensorKind
 
-MOTION_CLASSES = {BinarySensorDeviceClass.MOTION, BinarySensorDeviceClass.OCCUPANCY}
+# The sensors the model can interpret, and how each of them counts.
+SENSOR_KINDS = {
+    BinarySensorDeviceClass.MOTION: SensorKind.MOTION,
+    BinarySensorDeviceClass.OCCUPANCY: SensorKind.OCCUPANCY,
+}
 
 
 @dataclass
@@ -25,7 +30,12 @@ class RoomSpec:
     area_id: str
     name: str
     subentry_id: str | None = None
-    sensors: list[str] = field(default_factory=list)
+    kinds: dict[str, SensorKind] = field(default_factory=dict)  # the watched sensors
+    ignored: list[str] = field(default_factory=list)  # in the room, but of a kind we cannot read
+
+    @property
+    def sensors(self) -> list[str]:
+        return list(self.kinds)
 
 
 @dataclass
@@ -54,13 +64,18 @@ def home_assistant_area(hass: HomeAssistant, entry: er.RegistryEntry) -> str | N
     return area_id if area_id and ar.async_get(hass).async_get_area(area_id) else None
 
 
+def sensor_kind(entry: er.RegistryEntry) -> SensorKind | None:
+    """By the device class, where the user's "show as" wins over the integration's."""
+    return SENSOR_KINDS.get(entry.device_class or entry.original_device_class)
+
+
 def propose_sensors(hass: HomeAssistant) -> dict[str, str]:
     """Enabled motion and occupancy sensors, each with the area Home Assistant puts it in."""
     proposals: dict[str, str] = {}
     for entry in er.async_get(hass).entities.values():
         if entry.domain != "binary_sensor" or entry.disabled:
             continue
-        if (entry.device_class or entry.original_device_class) not in MOTION_CLASSES:
+        if sensor_kind(entry) is None:
             continue
         area_id = home_assistant_area(hass, entry)
         if area_id is not None:
@@ -161,6 +176,14 @@ def build_rooms(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, RoomSpec]:
     entities = er.async_get(hass).entities
     rooms: dict[str, RoomSpec] = {}
     for area_id, sub in room_entries(entry).items():
-        sensors = [e for e in sub.data[CONF_SENSORS] if e in entities and not entities[e].disabled]
-        rooms[area_id] = RoomSpec(area_id, sub.title, sub.subentry_id, sensors)
+        spec = RoomSpec(area_id, sub.title, sub.subentry_id)
+        for entity_id in sub.data[CONF_SENSORS]:
+            if entity_id not in entities or entities[entity_id].disabled:
+                continue
+            kind = sensor_kind(entities[entity_id])
+            if kind is None:
+                spec.ignored.append(entity_id)
+            else:
+                spec.kinds[entity_id] = kind
+        rooms[area_id] = spec
     return rooms

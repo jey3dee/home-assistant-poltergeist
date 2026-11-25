@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Poltergeist",
-        "description": "Estimate where people are in the house from motion sensors that are assigned to areas. Nothing needs to be configured here."
+        "description": "Estimate where people are in the house from motion and occupancy sensors that are assigned to areas. Nothing needs to be configured here."
       }
     },
     "abort": {
@@ -14,7 +14,7 @@
     "step": {
       "init": {
         "title": "Poltergeist",
-        "description": "How many people a room can hold before the top count means \"this many or more\". A single motion sensor cannot tell these counts apart; a higher value only matters once sensors that count people are added. Changing it reloads the integration.",
+        "description": "The highest number of people tracked in a room. Read the top count roughly as \"this many or more\". Motion and occupancy sensors cannot tell these counts apart; a higher value only matters once sensors that count people are added. Changing it reloads the integration.",
         "data": {
           "max_people": "Highest head count to track"
         },
@@ -51,7 +51,7 @@
         },
         "reconfigure": {
           "title": "Sensors of {room}",
-          "description": "The sensors that watch this room. A sensor can only watch one room: choosing one that watches another room moves it here.",
+          "description": "The motion and occupancy sensors that watch this room. A sensor can only watch one room: choosing one that watches another room moves it here.",
           "data": {
             "sensors": "Sensors"
           }

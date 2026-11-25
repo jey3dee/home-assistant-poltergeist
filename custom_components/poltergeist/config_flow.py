@@ -10,6 +10,7 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.selector import (
+    EntityFilterSelectorConfig,
     EntitySelector,
     EntitySelectorConfig,
     NumberSelector,
@@ -21,7 +22,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import CONF_MAX_PEOPLE, CONF_SENSORS, DEFAULT_MAX_PEOPLE, DOMAIN, SUBENTRY_ROOM
-from .discovery import proposals_for_area, room_entries
+from .discovery import SENSOR_KINDS, proposals_for_area, room_entries
 from .model import MAX_PEOPLE_LIMIT
 
 
@@ -118,7 +119,14 @@ class RoomSubentryFlow(ConfigSubentryFlow):
             {
                 vol.Optional(
                     CONF_SENSORS, default=list(subentry.data[CONF_SENSORS])
-                ): EntitySelector(EntitySelectorConfig(domain="binary_sensor", multiple=True))
+                ): EntitySelector(
+                    EntitySelectorConfig(
+                        filter=EntityFilterSelectorConfig(
+                            domain="binary_sensor", device_class=list(SENSOR_KINDS)
+                        ),
+                        multiple=True,
+                    )
+                )
             }
         )
         return self.async_show_form(

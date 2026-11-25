@@ -5,13 +5,18 @@ A Home Assistant custom integration that estimates where people are in the house
 ## What it does today (slice 01)
 
 - **Rooms** are entries under Settings > Devices & services > Poltergeist, one per Home Assistant area. They are created automatically, once: every area at first, and every area you add later. A room you delete stays deleted. The **+** button adds one back, from the areas that have no room. A room that no sensor watches reports `unknown`.
-- **Sensors:** each room's gear icon opens a picker with the sensors that watch it, any `binary_sensor`. They are proposed once, from Home Assistant's own areas (enabled `motion` and `occupancy` sensors; a sensor's own area wins over its device's). After that the list is yours: a sensor you remove is not proposed again, and moving a sensor to another area in Home Assistant does not move it here. A sensor watches one room: choosing it in another room moves it. Sensors deleted from Home Assistant are dropped. Renaming an area renames its room.
+- **Sensors:** each room's gear icon opens a picker with the sensors that watch it. Only `binary_sensor`s of the type `motion` or `occupancy` can be used so far (Home Assistant's "show as" setting counts); another type left in a room is not watched, and the log says so. They are proposed once, from Home Assistant's own areas (enabled `motion` and `occupancy` sensors; a sensor's own area wins over its device's). After that the list is yours: a sensor you remove is not proposed again, and moving a sensor to another area in Home Assistant does not move it here. A sensor watches one room: choosing it in another room moves it. Sensors deleted from Home Assistant are dropped. Renaming an area renames its room.
 - Each room gets one device named *Occupancy* with two sensors: the occupancy probability in percent and the expected head count.
-- A motion sensor switching to `on` is evidence that someone is there; silence slowly argues for an empty room. Each room is filtered separately, in continuous time, over a head count of 0 up to a highest value (see below). The default rates are priors, nothing is learned yet.
-- The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down is not counted as silence, and neither is time while all of a room's sensors are unavailable.
+- **How sensors count.** Each room is filtered separately, in continuous time, over a head count of 0 up to a highest value (see below). What a sensor does, and what it fails to do, moves the estimate:
+  - *Motion* is a trigger. Switching `on` is strong evidence that someone is there; while it is `off`, silence slowly argues for an empty room. While it is `on` it cannot trigger, so that time says nothing.
+  - *Occupancy* is a state. Switching `on` argues for someone, and so does staying `on`; switching `off` and staying `off` argue for an empty room.
+  - An `unavailable` or `unknown` sensor says nothing, and neither does coming back from it. A sensor already `on` when it is first seen counts from then on, not as a new switch.
+  - With several sensors in a room, each one adds its evidence. Two that see the same movement are counted as independent, which makes the estimate too sure.
+- All rates are assumed starting values; nothing is learned yet. Known limits: a motion sensor whose `on` time stretches with further movement loses that information; one that triggers as someone leaves reads as someone there; a sensor stuck `on` keeps an occupancy room occupied.
+- The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down counts as evidence from no sensor: only the possibility that people moved.
 - An admin-only sidebar panel lists the rooms live. Its Map, People, Sensors and Health tabs are empty.
 
-The head count is tracked from 0 up to a highest value you can change under Settings > Devices & services > Poltergeist > the gear of the integration itself (default 4, range 1 to 15; the top count means "this many or more"). A motion sensor cannot tell these counts apart, so a higher value only matters once sensors that count people are added. Changing it reloads the integration and keeps the saved beliefs.
+The head count is tracked from 0 up to a highest value you can change under Settings > Devices & services > Poltergeist > the gear of the integration itself (default 4, range 1 to 15; read the top count roughly as "this many or more"; the calculation treats it as exactly that many). Motion and occupancy sensors cannot tell these counts apart, so a higher value only matters once sensors that count people are added. Changing it reloads the integration and keeps the saved beliefs.
 
 Values are written to Home Assistant only when they move by 5 percentage points (0.1 persons for the head count), at most every 5 s, and at least every 5 minutes.
 
@@ -25,7 +30,7 @@ Requires Home Assistant 2026.11 or newer.
 2. Copy `custom_components/poltergeist` into the `custom_components` folder of your Home Assistant configuration and restart Home Assistant.
 3. Settings → Devices & services → Add integration → *Poltergeist*.
 
-Put your motion sensors into areas first; rooms follow the registry and the integration reloads itself when areas or sensors change.
+Put your motion and occupancy sensors into areas first; rooms follow the registry and the integration reloads itself when areas or sensors change.
 
 ## Develop
 

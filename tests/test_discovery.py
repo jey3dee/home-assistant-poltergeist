@@ -1,6 +1,7 @@
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from custom_components.poltergeist.discovery import build_rooms, propose_sensors
+from custom_components.poltergeist.model import SensorKind
 
 from .helpers import add_area, add_binary_sensor, add_entry, add_room
 
@@ -57,12 +58,26 @@ async def test_rooms_are_built_from_the_room_entries(hass):
 async def test_a_room_watches_the_sensors_of_its_entry_whatever_their_area(hass):
     hall = add_area(hass, "Hall")
     kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "pir", area_id=kitchen.id)
+    entry = add_entry(hass)
+    add_room(hass, entry, hall, [pir])
+    assert build_rooms(hass, entry)[hall.id].sensors == [pir]
+
+
+async def test_each_watched_sensor_has_the_kind_of_its_device_class(hass):
+    study = add_area(hass, "Study")
+    pir = add_binary_sensor(hass, "pir", area_id=study.id)
+    radar = add_binary_sensor(
+        hass, "radar", area_id=study.id, device_class=BinarySensorDeviceClass.OCCUPANCY
+    )
     door = add_binary_sensor(
-        hass, "front_door", area_id=kitchen.id, device_class=BinarySensorDeviceClass.DOOR
+        hass, "door", area_id=study.id, device_class=BinarySensorDeviceClass.DOOR
     )
     entry = add_entry(hass)
-    add_room(hass, entry, hall, [door])
-    assert build_rooms(hass, entry)[hall.id].sensors == [door]
+    add_room(hass, entry, study, [pir, radar, door])
+    spec = build_rooms(hass, entry)[study.id]
+    assert spec.kinds == {pir: SensorKind.MOTION, radar: SensorKind.OCCUPANCY}
+    assert spec.ignored == [door]
 
 
 async def test_disabled_and_deleted_sensors_are_not_watched(hass):

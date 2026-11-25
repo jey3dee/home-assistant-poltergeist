@@ -8,11 +8,32 @@ spec for a one-room house, up to the grid step.
 import numpy as np
 
 
-def forward_oracle(params, events, t_start, t_end, initial, step=0.25):
-    """Belief over head count at t_end, given motion events (seconds) in [t_start, t_end]."""
+def forward_oracle(params, sensors, changes, t_start, t_end, initial, step=0.25):
+    """Belief over head count at t_end.
+
+    `sensors` is a list of (kind, state at t_start), kind "motion" or "occupancy" and state True
+    (on), False (off) or None (not heard). `changes` is a time-ordered list of
+    (seconds, sensor index, new state). The sensor rules are written out here a second time on
+    purpose, instead of asking the production model for them.
+    """
     n_states = params.max_people + 1
-    n = np.arange(n_states)
-    rates = np.where(n == 0, params.event_rate_empty, params.event_rate_present)
+    empty = np.arange(n_states) == 0
+
+    def per_state(when_empty, when_occupied):
+        return np.where(empty, when_empty, when_occupied)
+
+    motion = per_state(params.motion_rate_empty, params.motion_rate_present)
+    switch_on = per_state(params.occupancy_on_rate_empty, params.occupancy_on_rate_present)
+    switch_off = per_state(params.occupancy_off_rate_empty, params.occupancy_off_rate_present)
+
+    def pending_rate(kind, state):
+        """Rate of the change that may happen next. A motion sensor that is on has none."""
+        if state is None or (kind == "motion" and state):
+            return np.zeros(n_states)
+        if kind == "motion":
+            return motion
+        return switch_off if state else switch_on
+
     trans = np.zeros((n_states, n_states))
     for k in range(n_states):
         up = params.arrival_rate if k < n_states - 1 else 0.0
@@ -22,19 +43,29 @@ def forward_oracle(params, events, t_start, t_end, initial, step=0.25):
             trans[k, k + 1] = up * step
         if k > 0:
             trans[k, k - 1] = down * step
+
     steps = int(round((t_end - t_start) / step))
-    event_steps: dict[int, int] = {}
-    for t in events:
-        idx = min(int((t - t_start) / step), steps - 1)
-        event_steps[idx] = event_steps.get(idx, 0) + 1
+    by_step: dict[int, list] = {}
+    for t, index, new in changes:
+        by_step.setdefault(min(int((t - t_start) / step), steps - 1), []).append((index, new))
+
+    kinds = [kind for kind, _ in sensors]
+    states = [state for _, state in sensors]
     belief = np.array(initial, dtype=float)
     for i in range(steps):
         belief = belief @ trans
-        count = event_steps.get(i, 0)
-        if count:
-            belief = belief * (rates * step) ** count
-        else:
-            belief = belief * (1.0 - rates * step)
+        happening = by_step.get(i, [])
+        changed = {index for index, _ in happening}
+        for index, kind in enumerate(kinds):
+            if index not in changed:
+                belief = belief * (1.0 - pending_rate(kind, states[index]) * step)
+        for index, new in happening:
+            old = states[index]
+            if old is not None and new is not None and old != new:
+                # a motion sensor going off is its hold time running out: no evidence
+                if not (kinds[index] == "motion" and old):
+                    belief = belief * pending_rate(kinds[index], old) * step
+            states[index] = new
         belief = belief / belief.sum()
     return belief
 

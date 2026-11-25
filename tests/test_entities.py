@@ -98,6 +98,8 @@ async def test_silence_lowers_the_probability_over_time(hass, freezer):
     await hass.async_block_till_done()
     await settle(hass, freezer)
     high = float(hass.states.get("sensor.kitchen_occupancy_probability").state)
+    hass.states.async_set(pir, "off")  # only a sensor that could trigger is silent
+    await hass.async_block_till_done()
     freezer.tick(timedelta(hours=3))
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
@@ -152,6 +154,7 @@ async def test_a_room_with_one_working_sensor_still_counts_silence(hass, freezer
     await setup_poltergeist(hass)
     hass.states.async_set(working, "on")
     await hass.async_block_till_done()
+    hass.states.async_set(working, "off")
     hass.states.async_set(dead, "unavailable")
     await hass.async_block_till_done()
     await settle(hass, freezer, seconds=3 * 3600)
