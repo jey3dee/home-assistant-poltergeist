@@ -56,3 +56,12 @@ async def test_a_reload_after_saved_settings_or_rooms_says_why(hass, caplog):
     await hass.config_entries.options.async_configure(result["flow_id"], {"max_people": 6})
     await hass.async_block_till_done()
     assert "Settings or rooms were saved, reloading" in messages(caplog, logging.INFO)
+
+
+async def test_the_startup_summary_does_not_say_every_room_has_sensors(hass, caplog):
+    caplog.set_level(logging.INFO)
+    kitchen = add_area(hass, "Kitchen")
+    add_area(hass, "Bedroom")
+    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+    assert "Tracking 2 rooms (Kitchen, Bedroom); 1 with sensors" in messages(caplog, logging.INFO)

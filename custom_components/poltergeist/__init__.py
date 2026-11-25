@@ -83,10 +83,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: PoltergeistConfigEntry) 
     version = async_get_loaded_integration(hass, DOMAIN).version
     await panel.async_register_panel(hass, str(version))
     _LOGGER.info(
-        "Tracking %d rooms, %d with sensors: %s",
+        "Tracking %d rooms (%s); %d with sensors",
         len(specs),
-        sum(1 for s in specs.values() if s.sensors),
         ", ".join(s.name for s in specs.values()),
+        sum(1 for s in specs.values() if s.sensors),
     )
     return True
 
