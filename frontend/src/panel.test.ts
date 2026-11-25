@@ -98,7 +98,7 @@ describe("poltergeist-panel", () => {
     expect(el.shadowRoot!.querySelectorAll(".fill")).toHaveLength(1);
   });
 
-  it("shows the five tabs and switches between them", async () => {
+  it("shows the four tabs and switches between them", async () => {
     const { hass, calls } = fakeHass();
     const el = await mount(hass);
     calls[0].callback({ rooms: [kitchen] });
@@ -108,7 +108,6 @@ describe("poltergeist-panel", () => {
       "Overview",
       "Map",
       "People",
-      "Sensors",
       "Health",
     ]);
     tabs[1].click();

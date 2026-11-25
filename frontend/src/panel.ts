@@ -3,7 +3,7 @@ import { formatCount, formatPercent } from "./format";
 import type { Hass, Room, RoomsMessage } from "./types";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
-const TABS = ["Overview", "Map", "People", "Sensors", "Health"] as const;
+const TABS = ["Overview", "Map", "People", "Health"] as const;
 type Tab = (typeof TABS)[number];
 
 export class PoltergeistPanel extends LitElement {

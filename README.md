@@ -14,7 +14,7 @@ A Home Assistant custom integration that estimates where people are in the house
   - With several sensors in a room, each one adds its evidence. Two that see the same movement are counted as independent, which makes the estimate too sure.
 - All rates are assumed starting values; nothing is learned yet. Known limits: a motion sensor whose `on` time stretches with further movement loses that information; one that triggers as someone leaves reads as someone there; a sensor stuck `on` keeps an occupancy room occupied.
 - The beliefs are stored in `.storage/poltergeist`. Time while Home Assistant was down counts as evidence from no sensor: only the possibility that people moved.
-- An admin-only sidebar panel lists the rooms live. Its Map, People, Sensors and Health tabs are empty.
+- An admin-only sidebar panel lists the rooms live. Its Map, People and Health tabs are empty.
 
 The head count is tracked from 0 up to a highest value you can change under Settings > Devices & services > Poltergeist > the gear of the integration itself (default 4, range 1 to 15; read the top count roughly as "this many or more"; the calculation treats it as exactly that many). Motion and occupancy sensors cannot tell these counts apart, so a higher value only matters once sensors that count people are added. Changing it reloads the integration and keeps the saved beliefs.
 
