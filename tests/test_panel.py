@@ -1,5 +1,7 @@
 import asyncio
 
+from homeassistant.helpers import area_registry as ar
+
 from custom_components.poltergeist.const import DOMAIN
 
 from .helpers import add_area, add_binary_sensor, setup_poltergeist
@@ -78,3 +80,16 @@ async def test_subscription_survives_a_reload_of_the_entry(hass, hass_ws_client)
         lambda e: any(r["name"] == "Hall" and (r["probability"] or 0) > 99.0 for r in e["rooms"]),
     )
     assert update
+
+
+async def test_an_open_panel_learns_a_rooms_new_name(hass, hass_ws_client):
+    bedroom = add_area(hass, "Bedroom")  # no sensors: no value will ever change
+    await setup_poltergeist(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "poltergeist/subscribe"})
+    await client.receive_json()
+    await client.receive_json()
+
+    ar.async_get(hass).async_update(bedroom.id, name="Study")
+    await hass.async_block_till_done()
+    await _next_event_where(client, lambda e: [r["name"] for r in e["rooms"]] == ["Study"])
