@@ -59,6 +59,7 @@
       },
       "abort": {
         "all_areas_are_rooms": "Every area of Home Assistant is already a room.",
+        "area_gone": "That area no longer exists. Select Add room again.",
         "reconfigure_successful": "Saved."
       }
     }

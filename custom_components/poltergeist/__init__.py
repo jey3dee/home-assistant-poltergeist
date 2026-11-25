@@ -1,6 +1,7 @@
 """Poltergeist: probabilistic presence tracking."""
 
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -117,7 +118,7 @@ def _watch_registries(
     current = fingerprint(estimator.specs())
 
     @callback
-    def changed(_event: Event) -> None:
+    def changed(_event: Event[Any]) -> None:
         if (
             plan_room_sync(hass, entry).changes_rooms
             or fingerprint(build_rooms(hass, entry)) != current

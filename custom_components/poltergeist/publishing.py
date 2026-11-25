@@ -17,7 +17,7 @@ class Publisher:
     def due(self, now: float, value: float | None) -> bool:
         if self._time is None or (value is None) != (self._value is None):
             return True  # first value, or the value appeared or disappeared
-        if value is None:
+        if value is None or self._value is None:
             return False  # still no value: nothing to republish
         elapsed = now - self._time
         if elapsed < self.min_interval:

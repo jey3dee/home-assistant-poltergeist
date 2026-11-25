@@ -39,6 +39,7 @@ uv sync                      # Python 3.14.2 or newer and the Home Assistant tes
 uv run pytest                # model, oracle comparison and integration tests
 uv run ruff check .
 uv run ruff format --check .
+uv run mypy                  # type check of the integration code
 
 cd frontend
 npm ci

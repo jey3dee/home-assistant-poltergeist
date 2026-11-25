@@ -161,10 +161,10 @@ class RoomBelief:
         return self._propagators[key]
 
     def _stationary(self) -> np.ndarray:
-        w = [1.0]
+        weights = [1.0]
         for k in range(1, self.params.n_states):
-            w.append(w[-1] * self.params.arrival_rate / (k * self.params.leave_rate))
-        w = np.array(w)
+            weights.append(weights[-1] * self.params.arrival_rate / (k * self.params.leave_rate))
+        w = np.array(weights)
         return w / w.sum()
 
     @property

@@ -1,4 +1,4 @@
-import voluptuous as vol
+import probatio as vol
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -10,9 +10,9 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.selector import (
-    EntityFilterSelectorConfig,
     EntitySelector,
     EntitySelectorConfig,
+    EntityWithDeviceFilterSelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -84,6 +84,8 @@ class RoomSubentryFlow(ConfigSubentryFlow):
             return self.async_abort(reason="all_areas_are_rooms")
         if user_input is not None:
             area = ar.async_get(self.hass).async_get_area(user_input["area"])
+            if area is None:  # deleted while the form was open
+                return self.async_abort(reason="area_gone")
             return self.async_create_entry(
                 title=area.name,
                 data={CONF_SENSORS: proposals_for_area(self.hass, entry, area.id)},
@@ -121,7 +123,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
                     CONF_SENSORS, default=list(subentry.data[CONF_SENSORS])
                 ): EntitySelector(
                     EntitySelectorConfig(
-                        filter=EntityFilterSelectorConfig(
+                        filter=EntityWithDeviceFilterSelectorConfig(
                             domain="binary_sensor", device_class=list(SENSOR_KINDS)
                         ),
                         multiple=True,

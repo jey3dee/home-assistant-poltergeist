@@ -2,6 +2,7 @@
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import area_registry as ar
 
 from custom_components.poltergeist.const import DOMAIN, SUBENTRY_ROOM
 
@@ -146,3 +147,21 @@ async def test_moving_a_sensor_between_rooms_causes_at_most_two_reloads(hass):
     # call that asks for it, so what counts is that it is not more than one per room entry
     assert 1 <= len(built) <= 2
     assert DOMAIN in hass.config.components
+
+
+async def test_add_ends_cleanly_if_the_area_is_deleted_while_the_form_is_open(hass):
+    hall = add_area(hass, "Hall")
+    attic = add_area(hass, "Attic")  # still free afterwards, so the form has something to offer
+    entry = await setup_poltergeist(hass)
+    for area in (hall, attic):
+        hass.config_entries.async_remove_subentry(entry, room(entry, area.id).subentry_id)
+        await hass.async_block_till_done()
+    result = await start_add(hass, entry)
+
+    ar.async_get(hass).async_delete(hall.id)
+    await hass.async_block_till_done()
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"area": hall.id}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "area_gone"

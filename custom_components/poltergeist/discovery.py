@@ -19,7 +19,7 @@ from .const import CONF_SEEN_AREAS, CONF_SEEN_SENSORS, CONF_SENSORS, SUBENTRY_RO
 from .model import SensorKind
 
 # The sensors the model can interpret, and how each of them counts.
-SENSOR_KINDS = {
+SENSOR_KINDS: dict[str, SensorKind] = {
     BinarySensorDeviceClass.MOTION: SensorKind.MOTION,
     BinarySensorDeviceClass.OCCUPANCY: SensorKind.OCCUPANCY,
 }
@@ -66,7 +66,8 @@ def home_assistant_area(hass: HomeAssistant, entry: er.RegistryEntry) -> str | N
 
 def sensor_kind(entry: er.RegistryEntry) -> SensorKind | None:
     """By the device class, where the user's "show as" wins over the integration's."""
-    return SENSOR_KINDS.get(entry.device_class or entry.original_device_class)
+    device_class = entry.device_class or entry.original_device_class
+    return None if device_class is None else SENSOR_KINDS.get(device_class)
 
 
 def propose_sensors(hass: HomeAssistant) -> dict[str, str]:

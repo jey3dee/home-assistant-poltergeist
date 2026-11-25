@@ -13,6 +13,7 @@ dev = [
     "home-assistant-frontend==20261028.8",
     "pytest-homeassistant-custom-component==0.13.375",
     "ruff",
+    "mypy==2.4.1",
 ]
 
 [tool.pytest.ini_options]
@@ -20,6 +21,10 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-p tests.ha_compat"
+
+[tool.mypy]
+files = ["custom_components/poltergeist"]
+check_untyped_defs = true
 
 [tool.ruff]
 line-length = 100
