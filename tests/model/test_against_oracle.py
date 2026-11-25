@@ -44,7 +44,7 @@ def run_model(params, scenario, checkpoints):
 
 def assert_matches_oracle(params, scenario, checkpoints, label):
     model = run_model(params, scenario, checkpoints)
-    prior = RoomBelief(params).probabilities
+    prior = RoomBelief(params, t=0.0).probabilities
     for c in checkpoints:
         changes = [change for change in scenario.changes if change[0] < c]
         oracle = forward_oracle(params, scenario.sensors, changes, 0.0, c, prior)
@@ -77,7 +77,7 @@ def test_matches_oracle_for_other_room_sizes(max_people):
 @pytest.mark.parametrize("house", HOUSES)
 def test_posterior_beats_prior_on_simulated_truth(house):
     log_post, log_prior = [], []
-    prior = RoomBelief(PARAMS).probabilities
+    prior = RoomBelief(PARAMS, t=0.0).probabilities
     for seed in range(10, 20):
         scenario = simulate(PARAMS, duration=4 * 3600.0, seed=seed, kinds=HOUSES[house])
         checkpoints = [float(c) for c in range(600, 4 * 3600, 600)]

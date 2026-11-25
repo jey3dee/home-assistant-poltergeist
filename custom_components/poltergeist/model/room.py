@@ -142,9 +142,7 @@ class _Propagator:
 
 
 class RoomBelief:
-    def __init__(
-        self, params: RoomParams, probabilities=None, t: float | None = None, name: str = "A room"
-    ):
+    def __init__(self, params: RoomParams, *, t: float, probabilities=None, name: str = "A room"):
         self.params = params
         self.name = name  # only for the log
         # Rows are the "from" state, so a belief row vector moves as `belief @ propagator`.
@@ -158,8 +156,6 @@ class RoomBelief:
     def _propagator(self, dwell: np.ndarray) -> _Propagator:
         key = dwell.tobytes()
         if key not in self._propagators:
-            # A = Q - D has real, distinct eigenvalues for any diagonal D (it is similar to a
-            # symmetric tridiagonal matrix), so exp(A dt) comes from one eigendecomposition.
             self._propagators[key] = _Propagator(self.params.generator - np.diag(dwell))
         return self._propagators[key]
 
@@ -184,7 +180,7 @@ class RoomBelief:
         Wall-clock ticks and event timestamps can differ by a few milliseconds; the belief itself
         never moves backwards (`advance` refuses), so callers clamp with this first.
         """
-        return t if self.t is None else max(t, self.t)
+        return max(t, self.t)
 
     def advance(self, t: float, readings: Iterable[Reading] = ()) -> None:
         """Move the belief to time t, with the sensors as they were during that time.
@@ -192,9 +188,6 @@ class RoomBelief:
         Each listening sensor that did not change is itself evidence. Without readings nobody was
         listening (for example Home Assistant was down), so the belief only follows the dynamics.
         """
-        if self.t is None:
-            self.t = t
-            return
         dt = t - self.t
         if dt < 0:
             raise ValueError(f"time went backwards by {-dt} s")

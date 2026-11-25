@@ -24,19 +24,19 @@ def stationary(params):
 
 
 def test_prior_is_the_stationary_distribution():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     assert belief.probabilities == pytest.approx(stationary(PARAMS))
 
 
 def test_without_event_evidence_belief_stays_stationary():
     silent = RoomParams(motion_rate_present=0.0, motion_rate_empty=0.0)
-    belief = RoomBelief(silent)
+    belief = RoomBelief(silent, t=0.0)
     belief.advance(10_000.0, QUIET)
     assert belief.probabilities == pytest.approx(stationary(silent), abs=1e-9)
 
 
 def test_silence_after_motion_lowers_occupancy_monotonically():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     motion(belief, 0.0)
     last = belief.p_occupied
     for t in (60.0, 600.0, 3600.0, 6 * 3600.0):
@@ -47,7 +47,7 @@ def test_silence_after_motion_lowers_occupancy_monotonically():
 
 
 def test_extreme_gap_does_not_underflow():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     motion(belief, 0.0)
     belief.advance(3.0e8, QUIET)  # about ten years
     assert np.isfinite(belief.probabilities).all()
@@ -55,21 +55,21 @@ def test_extreme_gap_does_not_underflow():
 
 
 def test_expected_head_count_matches_distribution():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     motion(belief, 5.0)
     expected = float(np.dot(np.arange(len(belief.probabilities)), belief.probabilities))
     assert belief.expected_count == pytest.approx(expected)
 
 
 def test_time_must_not_go_backwards():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     belief.advance(100.0)
     with pytest.raises(ValueError):
         belief.advance(50.0)
 
 
 def test_snapshot_round_trip():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     motion(belief, 42.0)
     restored = RoomBelief.from_snapshot(PARAMS, belief.snapshot())
     assert restored.probabilities == pytest.approx(belief.probabilities)
@@ -85,9 +85,9 @@ def test_params_must_be_positive_where_required():
 
 def test_blind_advance_does_not_treat_the_gap_as_silence():
     # While nobody was listening (HA down), no-event evidence must not accumulate.
-    observed = RoomBelief(PARAMS)
+    observed = RoomBelief(PARAMS, t=0.0)
     motion(observed, 0.0)
-    blind = RoomBelief(PARAMS)
+    blind = RoomBelief(PARAMS, t=0.0)
     motion(blind, 0.0)
     observed.advance(1800.0, QUIET)
     blind.advance(1800.0)
@@ -95,7 +95,7 @@ def test_blind_advance_does_not_treat_the_gap_as_silence():
 
 
 def test_blind_advance_over_a_long_gap_returns_to_the_prior():
-    belief = RoomBelief(PARAMS)
+    belief = RoomBelief(PARAMS, t=0.0)
     motion(belief, 0.0)
     belief.advance(10 * 86400.0)
     assert belief.probabilities == pytest.approx(stationary(PARAMS), abs=1e-9)
@@ -116,12 +116,11 @@ def test_latest_never_goes_backwards_and_treats_zero_as_a_time():
     belief = RoomBelief(PARAMS, t=0.0)
     assert belief.latest(-5.0) == 0.0  # zero is a real time, not "unset"
     assert belief.latest(7.0) == 7.0
-    assert RoomBelief(PARAMS).latest(3.0) == 3.0  # no time yet: take the given one
 
 
 def test_default_tracks_up_to_four_people():
     assert RoomParams().max_people == 4
-    assert len(RoomBelief(RoomParams()).probabilities) == 5
+    assert len(RoomBelief(RoomParams(), t=0.0).probabilities) == 5
 
 
 @pytest.mark.parametrize("bad", [0, 16])
@@ -132,7 +131,7 @@ def test_max_people_outside_the_checked_range_is_refused(bad):
 
 @pytest.mark.parametrize("ok", [1, 15])
 def test_max_people_range_ends_are_accepted(ok):
-    assert len(RoomBelief(RoomParams(max_people=ok)).probabilities) == ok + 1
+    assert len(RoomBelief(RoomParams(max_people=ok), t=0.0).probabilities) == ok + 1
 
 
 def test_a_busy_room_is_counted_above_the_default_top_state():
