@@ -1,7 +1,10 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import EVENT_HOMEASSISTANT_FINAL_WRITE, EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import CoreState
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -29,6 +32,32 @@ async def test_beliefs_survive_a_restart(hass, hass_storage):
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert float(hass.states.get("sensor.kitchen_occupancy_probability").state) > 90.0
+
+
+async def test_shutdown_after_a_quiet_period_saves_the_current_beliefs(hass, hass_storage, freezer):
+    kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    entry = await setup_poltergeist(hass)
+    for state in ("on", "off"):
+        hass.states.async_set(pir, state)
+        await hass.async_block_till_done()
+    for _ in range(120):  # two quiet hours: the delayed save is long done
+        freezer.tick(timedelta(minutes=1))
+        async_fire_time_changed(hass, dt_util.utcnow())
+        await hass.async_block_till_done()
+
+    # Home Assistant stops without unloading the integration
+    hass.set_state(CoreState.stopping)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_FINAL_WRITE)
+    await hass.async_block_till_done()
+
+    saved = hass_storage[DOMAIN]["data"]["rooms"][kitchen.id]
+    assert dt_util.utcnow().timestamp() - saved["t"] < 90
+    live = entry.runtime_data.rooms[kitchen.id].probability
+    assert 100 * (1 - saved["probabilities"][0]) == pytest.approx(live, abs=0.1)
+    hass.set_state(CoreState.running)
 
 
 async def test_downtime_is_not_counted_as_silence(hass, hass_storage, freezer):

@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from datetime import timedelta
 
-from homeassistant.const import STATE_OFF, STATE_ON
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP, STATE_OFF, STATE_ON
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -145,6 +145,7 @@ class Estimator:
                 room.states[entity_id] = _value(self.hass.states.get(entity_id))
         undo = [
             async_track_time_interval(self.hass, self._tick, timedelta(seconds=TICK_INTERVAL)),
+            self.hass.bus.async_listen(EVENT_HOMEASSISTANT_STOP, self._save_at_stop),
         ]
         if self._room_of_sensor:
             undo.append(
@@ -210,6 +211,12 @@ class Estimator:
         if not self._save_pending:
             self._save_pending = True
             self._store.async_delay_save(self._stored_data, SAVE_DELAY)
+
+    @callback
+    def _save_at_stop(self, _event: Event) -> None:
+        # Stopping does not unload the integration, and Home Assistant's final write only writes
+        # what is waiting. Without this, a quiet house would restore the beliefs of its last change.
+        self._store.async_delay_save(self._stored_data)
 
     def _stored_data(self) -> dict:
         """What is written. Every write, delayed or not, asks for it here."""
