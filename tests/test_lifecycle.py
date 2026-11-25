@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import area_registry as ar
@@ -8,6 +9,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.poltergeist.const import DOMAIN
+from custom_components.poltergeist.estimator import UpdateListeners
 
 from .helpers import add_area, add_binary_sensor, room, room_sensors, setup_poltergeist
 
@@ -208,3 +210,15 @@ async def test_a_belief_survives_a_change_of_the_highest_head_count(hass):
     belief = entry.runtime_data.rooms[kitchen.id].belief
     assert len(belief.probabilities) == 3
     assert belief.p_occupied > 0.99
+
+
+async def test_reload_requests_are_merged_until_a_reload_has_started(hass):
+    await setup_poltergeist(hass)
+    listeners = UpdateListeners()
+    with patch.object(hass.config_entries, "async_schedule_reload") as schedule:
+        for _ in range(10):
+            listeners.request_reload(hass)
+        assert schedule.call_count == 1  # ten changes before the reload started: one reload
+        listeners.reload_started()
+        listeners.request_reload(hass)
+        assert schedule.call_count == 2  # a change after the reload began needs its own

@@ -137,7 +137,7 @@ async def test_a_sensor_taken_out_of_a_room_is_not_proposed_again(hass):
     assert room_sensors(entry, kitchen.id) == []
 
 
-async def test_an_edit_of_one_room_causes_one_reload(hass):
+async def test_moving_a_sensor_between_rooms_causes_at_most_two_reloads(hass):
     from unittest.mock import patch
 
     import custom_components.poltergeist as integration
