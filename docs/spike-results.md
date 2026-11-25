@@ -29,8 +29,13 @@ This is the independent-room model of this slice only. It says nothing about the
 
 ## Go/no-go
 
-- **Go on:** numpy and scipy availability, `recorder.history`, removal behaviour, persistence across restarts, panel delivery.
-- **Not decided here:** the event-loop stall on target hardware (item 1) and whether the Supervisor watchdog is on by default (item 7). Neither was measured in this slice.
+**Provisional go** (2026-11-25).
+
+- **Passed:** numpy in the image (amd64), removal behaviour, persistence across restarts, panel delivery.
+- **Partly checked:** scipy (amd64 only; 2026.11.2 and 2026.11.3) and `recorder.history` (a short test sequence, not the weeks the spec asks for).
+- **Not decided:** the event-loop stall on target hardware (item 1) and the Supervisor watchdog (item 7). Neither was measured. The timings above predate the current sensor model.
+
+Ticket 02 closes the open points on a Home Assistant Yellow, and the final decision is made before ticket 03.
 
 ## Test harness gap
 
