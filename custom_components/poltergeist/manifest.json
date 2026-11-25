@@ -1,6 +1,7 @@
 {
   "domain": "poltergeist",
   "name": "Poltergeist",
+  "categories": ["sensors.motion_presence"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [
