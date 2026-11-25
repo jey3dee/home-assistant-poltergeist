@@ -8,7 +8,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
-from custom_components.poltergeist.const import DOMAIN
+from custom_components.poltergeist.const import DOMAIN, SAVE_DELAY
 from custom_components.poltergeist.estimator import UpdateListeners
 
 from .helpers import add_area, add_binary_sensor, room, room_sensors, setup_poltergeist
@@ -148,7 +148,7 @@ async def test_removal_after_a_pending_delayed_save_leaves_no_store(hass, hass_s
     await hass.async_block_till_done()
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
-    freezer.tick(timedelta(minutes=5))
+    freezer.tick(timedelta(seconds=SAVE_DELAY + 60))  # past the pending save
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
     assert DOMAIN not in hass_storage
@@ -234,9 +234,10 @@ async def test_beliefs_are_saved_while_sensors_keep_changing(hass, hass_storage,
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     await setup_poltergeist(hass)
 
-    await _keep_switching(hass, freezer, pir, 120)
+    a_bit_longer = int(SAVE_DELAY) + 60
+    await _keep_switching(hass, freezer, pir, a_bit_longer)
     first = hass_storage[DOMAIN]["data"]["rooms"][kitchen.id]["t"]
     assert dt_util.utcnow().timestamp() - first < 120
 
-    await _keep_switching(hass, freezer, pir, 120)  # and it goes on saving after that
-    assert hass_storage[DOMAIN]["data"]["rooms"][kitchen.id]["t"] > first + 60
+    await _keep_switching(hass, freezer, pir, a_bit_longer)  # and it goes on saving after that
+    assert hass_storage[DOMAIN]["data"]["rooms"][kitchen.id]["t"] > first + SAVE_DELAY / 2

@@ -17,6 +17,6 @@ HEAD_COUNT_STEP = 0.1  # persons
 MIN_PUBLISH_INTERVAL = 5.0  # seconds
 HEARTBEAT = 300.0  # seconds
 TICK_INTERVAL = 5.0  # seconds between belief updates while no event arrives
-SAVE_DELAY = 60.0  # seconds from the first unsaved change to writing the beliefs
+SAVE_DELAY = 300.0  # seconds from the first unsaved change to writing the beliefs
 
 UPDATE_LISTENERS_KEY = f"{DOMAIN}_update_listeners"
