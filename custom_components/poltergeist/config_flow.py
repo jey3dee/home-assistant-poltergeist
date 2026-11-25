@@ -22,7 +22,13 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import CONF_MAX_PEOPLE, CONF_SENSORS, DEFAULT_MAX_PEOPLE, DOMAIN, SUBENTRY_ROOM
-from .discovery import SENSOR_KINDS, proposals_for_area, room_entries
+from .discovery import (
+    SENSOR_KINDS,
+    proposals_for_area,
+    room_entries,
+    sensor_entity_ids,
+    sensor_ids,
+)
 from .model import MAX_PEOPLE_LIMIT
 
 
@@ -106,7 +112,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
         entry = self._get_entry()
         subentry = self._get_reconfigure_subentry()
         if user_input is not None:
-            chosen = user_input[CONF_SENSORS]
+            chosen = sensor_ids(self.hass, user_input[CONF_SENSORS])
             # A sensor watches one room: choosing it here takes it out of the room it was in.
             for other in room_entries(entry).values():
                 kept = [e for e in other.data[CONF_SENSORS] if e not in chosen]
@@ -120,7 +126,8 @@ class RoomSubentryFlow(ConfigSubentryFlow):
         schema = vol.Schema(
             {
                 vol.Optional(
-                    CONF_SENSORS, default=list(subentry.data[CONF_SENSORS])
+                    CONF_SENSORS,
+                    default=sensor_entity_ids(self.hass, subentry.data[CONF_SENSORS]),
                 ): EntitySelector(
                     EntitySelectorConfig(
                         filter=EntityWithDeviceFilterSelectorConfig(

@@ -2,14 +2,19 @@ from types import MappingProxyType
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.config_entries import ConfigSubentry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, async_get_hass
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.poltergeist.const import CONF_SENSORS, DOMAIN, SUBENTRY_ROOM
-from custom_components.poltergeist.discovery import apply_room_sync, plan_room_sync
+from custom_components.poltergeist.discovery import (
+    apply_room_sync,
+    plan_room_sync,
+    sensor_entity_ids,
+    sensor_ids,
+)
 
 
 def add_area(hass: HomeAssistant, name: str):
@@ -83,14 +88,26 @@ def room(entry: MockConfigEntry, area_id: str) -> ConfigSubentry | None:
 
 def room_sensors(entry: MockConfigEntry, area_id: str) -> list[str] | None:
     found = room(entry, area_id)
-    return None if found is None else list(found.data[CONF_SENSORS])
+    return None if found is None else sensor_entity_ids(async_get_hass(), found.data[CONF_SENSORS])
+
+
+def stored(hass: HomeAssistant, entity_ids) -> list[str]:
+    """As a room stores them. A name without a registry entry is kept, to stand for a lost one."""
+    return [next(iter(sensor_ids(hass, [e])), e) for e in entity_ids]
+
+
+def set_room_sensors(hass: HomeAssistant, entry: MockConfigEntry, area_id: str, sensors):
+    """What the user's choice in the room's screen stores."""
+    hass.config_entries.async_update_subentry(
+        entry, room(entry, area_id), data={CONF_SENSORS: stored(hass, sensors)}
+    )
 
 
 def add_room(hass: HomeAssistant, entry: MockConfigEntry, area, sensors=()):
     hass.config_entries.async_add_subentry(
         entry,
         ConfigSubentry(
-            data=MappingProxyType({CONF_SENSORS: list(sensors)}),
+            data=MappingProxyType({CONF_SENSORS: stored(hass, sensors)}),
             subentry_type=SUBENTRY_ROOM,
             title=area.name,
             unique_id=area.id,

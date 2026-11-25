@@ -8,7 +8,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
-from .helpers import add_area, add_binary_sensor, setup_poltergeist
+from .helpers import add_area, add_binary_sensor, set_room_sensors, setup_poltergeist
 
 OCCUPANCY = BinarySensorDeviceClass.OCCUPANCY
 
@@ -101,9 +101,8 @@ async def test_only_motion_and_occupancy_sensors_are_watched(hass, freezer, capl
     )
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     entry = await setup_poltergeist(hass)
-    sub = next(iter(entry.subentries.values()))
     caplog.set_level(logging.WARNING)
-    hass.config_entries.async_update_subentry(entry, sub, data={"sensors": [pir, door]})
+    set_room_sensors(hass, entry, kitchen.id, [pir, door])
     await hass.async_block_till_done()
     assert entry.runtime_data.rooms[kitchen.id].spec.sensors == [pir]
     assert door in caplog.text and "Kitchen" in caplog.text

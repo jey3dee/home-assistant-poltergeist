@@ -5,7 +5,16 @@ from homeassistant.helpers import entity_registry as er
 
 from custom_components.poltergeist.const import CONF_SEEN_AREAS, CONF_SEEN_SENSORS
 
-from .helpers import add_area, add_binary_sensor, add_entry, add_room, room, room_sensors, sync
+from .helpers import (
+    add_area,
+    add_binary_sensor,
+    add_entry,
+    add_room,
+    room,
+    room_sensors,
+    stored,
+    sync,
+)
 
 
 async def test_the_first_sync_makes_a_room_of_every_area_with_proposed_sensors(hass):
@@ -19,7 +28,7 @@ async def test_the_first_sync_makes_a_room_of_every_area_with_proposed_sensors(h
     assert room_sensors(entry, bedroom.id) == []
     assert room(entry, kitchen.id).title == "Kitchen"
     assert set(entry.data[CONF_SEEN_AREAS]) == {kitchen.id, bedroom.id}
-    assert entry.data[CONF_SEEN_SENSORS] == [pir]
+    assert entry.data[CONF_SEEN_SENSORS] == stored(hass, [pir])
 
 
 async def test_a_second_sync_changes_nothing(hass):
@@ -87,7 +96,7 @@ async def test_a_sensor_the_user_removed_is_not_proposed_again(hass):
     hass.config_entries.async_update_subentry(entry, sub, data={"sensors": []})
     sync(hass, entry)
     assert room_sensors(entry, kitchen.id) == []
-    assert pir in entry.data[CONF_SEEN_SENSORS]
+    assert stored(hass, [pir])[0] in entry.data[CONF_SEEN_SENSORS]
 
 
 async def test_a_sensor_in_another_room_stays_there_when_its_home_assistant_area_changes(hass):
@@ -107,10 +116,11 @@ async def test_a_deleted_sensor_is_dropped_from_its_room(hass):
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     entry = add_entry(hass)
     sync(hass, entry)
+    [pir_id] = stored(hass, [pir])
     er.async_get(hass).async_remove(pir)
     sync(hass, entry)
     assert room_sensors(entry, kitchen.id) == []
-    assert pir not in entry.data[CONF_SEEN_SENSORS]
+    assert pir_id not in entry.data[CONF_SEEN_SENSORS]
 
 
 async def test_new_sensors_of_a_deleted_room_are_not_added_anywhere(hass):

@@ -3,7 +3,12 @@ from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from custom_components.poltergeist.discovery import build_rooms, propose_sensors
 from custom_components.poltergeist.model import SensorKind
 
-from .helpers import add_area, add_binary_sensor, add_entry, add_room
+from .helpers import add_area, add_binary_sensor, add_entry, add_room, stored
+
+
+def expected(hass, by_entity_id):
+    """Proposals name sensors as rooms store them."""
+    return dict(zip(stored(hass, by_entity_id), by_entity_id.values(), strict=True))
 
 
 async def test_proposes_motion_sensors_by_their_area(hass):
@@ -12,7 +17,7 @@ async def test_proposes_motion_sensors_by_their_area(hass):
     a = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
     b = add_binary_sensor(hass, "kitchen_pir_2", area_id=kitchen.id)
     c = add_binary_sensor(hass, "hall_pir", device_area_id=hall.id)  # area comes from the device
-    assert propose_sensors(hass) == {a: kitchen.id, b: kitchen.id, c: hall.id}
+    assert propose_sensors(hass) == expected(hass, {a: kitchen.id, b: kitchen.id, c: hall.id})
 
 
 async def test_proposes_motion_and_occupancy_only(hass):
@@ -23,7 +28,7 @@ async def test_proposes_motion_and_occupancy_only(hass):
     )
     add_binary_sensor(hass, "door", area_id=area.id, device_class=BinarySensorDeviceClass.DOOR)
     add_binary_sensor(hass, "plain", area_id=area.id, device_class=None)
-    assert propose_sensors(hass) == {motion: area.id, occupancy: area.id}
+    assert propose_sensors(hass) == expected(hass, {motion: area.id, occupancy: area.id})
 
 
 async def test_proposes_nothing_for_sensors_without_area_or_disabled_ones(hass):
@@ -37,7 +42,7 @@ async def test_entity_area_overrides_device_area(hass):
     kitchen = add_area(hass, "Kitchen")
     hall = add_area(hass, "Hall")
     sensor = add_binary_sensor(hass, "pir", area_id=hall.id, device_area_id=kitchen.id)
-    assert propose_sensors(hass) == {sensor: hall.id}
+    assert propose_sensors(hass) == expected(hass, {sensor: hall.id})
 
 
 async def test_rooms_are_built_from_the_room_entries(hass):

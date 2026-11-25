@@ -1,8 +1,11 @@
 """Rooms and their sensors.
 
 A room is a config subentry of the integration, tied to one Home Assistant area and holding the
-entity ids of the sensors that watch it. Rooms and sensors are proposed from Home Assistant's
-areas, but each only once: what the user then deletes or removes is not proposed again.
+sensors that watch it. Rooms and sensors are proposed from Home Assistant's areas, but each only
+once: what the user then deletes or removes is not proposed again.
+
+What is stored names a sensor by its entity registry id ("sensor id" below), because the user can
+rename an entity id. The estimator and the panel work with entity ids.
 """
 
 from dataclasses import dataclass, field
@@ -70,17 +73,32 @@ def sensor_kind(entry: er.RegistryEntry) -> SensorKind | None:
     return None if device_class is None else SENSOR_KINDS.get(device_class)
 
 
+def sensor_ids(hass: HomeAssistant, entity_ids: list[str]) -> list[str]:
+    """The sensor ids to store. An entity without a registry entry has none and is left out."""
+    registry = er.async_get(hass)
+    return [found.id for e in entity_ids if (found := registry.async_get(e)) is not None]
+
+
+def sensor_entity_ids(hass: HomeAssistant, ids: list[str]) -> list[str]:
+    """What the stored sensors are called now. Sensors that no longer exist are left out."""
+    entities = er.async_get(hass).entities
+    return [found.entity_id for i in ids if (found := entities.get_entry(i)) is not None]
+
+
 def propose_sensors(hass: HomeAssistant) -> dict[str, str]:
-    """Enabled motion and occupancy sensors, each with the area Home Assistant puts it in."""
+    """Enabled motion and occupancy sensors by id, each with the area Home Assistant puts it in.
+
+    In the order of their entity ids, which is the order they are added to a room in.
+    """
     proposals: dict[str, str] = {}
-    for entry in er.async_get(hass).entities.values():
+    for entry in sorted(er.async_get(hass).entities.values(), key=lambda e: e.entity_id):
         if entry.domain != "binary_sensor" or entry.disabled:
             continue
         if sensor_kind(entry) is None:
             continue
         area_id = home_assistant_area(hass, entry)
         if area_id is not None:
-            proposals[entry.entity_id] = area_id
+            proposals[entry.id] = area_id
     return proposals
 
 
@@ -100,7 +118,7 @@ def sensors_of_rooms(entry: ConfigEntry) -> set[str]:
 def proposals_for_area(hass: HomeAssistant, entry: ConfigEntry, area_id: str) -> list[str]:
     """The sensors to start a room of this area with: its own, not watching another room yet."""
     taken = sensors_of_rooms(entry)
-    return sorted(e for e, a in propose_sensors(hass).items() if a == area_id and e not in taken)
+    return [i for i, a in propose_sensors(hass).items() if a == area_id and i not in taken]
 
 
 def plan_room_sync(hass: HomeAssistant, entry: ConfigEntry) -> SyncPlan:
@@ -115,7 +133,7 @@ def plan_room_sync(hass: HomeAssistant, entry: ConfigEntry) -> SyncPlan:
     # Rooms of areas that are gone go; the others keep the sensors that still exist.
     plan.remove = [sub.subentry_id for area_id, sub in rooms.items() if area_id not in areas]
     lists = {
-        area_id: [e for e in sub.data[CONF_SENSORS] if e in entities]
+        area_id: [i for i in sub.data[CONF_SENSORS] if entities.get_entry(i) is not None]
         for area_id, sub in rooms.items()
         if area_id in areas
     }
@@ -124,20 +142,20 @@ def plan_room_sync(hass: HomeAssistant, entry: ConfigEntry) -> SyncPlan:
     # An area that was never offered becomes a room, with the sensors it holds.
     for area in areas.values():
         if area.id not in rooms and area.id not in seen_areas:
-            sensors = sorted(
-                e
-                for e, a in proposals.items()
-                if a == area.id and e not in assigned and e not in seen_sensors
-            )
+            sensors = [
+                i
+                for i, a in proposals.items()
+                if a == area.id and i not in assigned and i not in seen_sensors
+            ]
             plan.add[area.id] = (area.name, sensors)
             lists[area.id] = sensors
             assigned.update(sensors)
 
     # A sensor that was never offered joins the room of its area, if that area has one.
-    for entity_id, area_id in sorted(proposals.items()):
-        if entity_id not in seen_sensors and entity_id not in assigned and area_id in lists:
-            lists[area_id].append(entity_id)
-            assigned.add(entity_id)
+    for sensor_id, area_id in proposals.items():
+        if sensor_id not in seen_sensors and sensor_id not in assigned and area_id in lists:
+            lists[area_id].append(sensor_id)
+            assigned.add(sensor_id)
 
     for area_id, sub in rooms.items():
         if area_id in areas:
@@ -146,7 +164,9 @@ def plan_room_sync(hass: HomeAssistant, entry: ConfigEntry) -> SyncPlan:
                 plan.update[sub.subentry_id] = (title, sensors)
 
     plan.seen_areas = sorted((seen_areas | set(lists)) & set(areas))
-    plan.seen_sensors = sorted((seen_sensors | assigned) & set(entities))
+    plan.seen_sensors = sorted(
+        i for i in seen_sensors | assigned if entities.get_entry(i) is not None
+    )
     return plan
 
 
@@ -178,13 +198,14 @@ def build_rooms(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, RoomSpec]:
     rooms: dict[str, RoomSpec] = {}
     for area_id, sub in room_entries(entry).items():
         spec = RoomSpec(area_id, sub.title, sub.subentry_id)
-        for entity_id in sub.data[CONF_SENSORS]:
-            if entity_id not in entities or entities[entity_id].disabled:
+        for sensor_id in sub.data[CONF_SENSORS]:
+            found = entities.get_entry(sensor_id)
+            if found is None or found.disabled:
                 continue
-            kind = sensor_kind(entities[entity_id])
+            kind = sensor_kind(found)
             if kind is None:
-                spec.ignored.append(entity_id)
+                spec.ignored.append(found.entity_id)
             else:
-                spec.kinds[entity_id] = kind
+                spec.kinds[found.entity_id] = kind
         rooms[area_id] = spec
     return rooms
