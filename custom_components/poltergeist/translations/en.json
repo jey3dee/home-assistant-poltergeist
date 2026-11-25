@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Poltergeist",
-        "description": "Estimate where people are in the house from motion and occupancy sensors that are assigned to areas. Nothing needs to be configured here."
+        "description": "Estimate where people are in the house from the motion and occupancy sensors of each room. Rooms are made from your areas. Nothing needs to be configured here."
       }
     },
     "abort": {
