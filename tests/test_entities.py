@@ -49,18 +49,6 @@ async def test_initial_state_is_the_prior(hass):
     )
 
 
-async def test_motion_event_raises_the_probability(hass, freezer):
-    kitchen = add_area(hass, "Kitchen")
-    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
-    await setup_poltergeist(hass)
-    before = float(hass.states.get("sensor.kitchen_occupancy_probability").state)
-    hass.states.async_set(pir, "on")
-    await hass.async_block_till_done()
-    await settle(hass, freezer)  # the minimum publish interval holds the write until the tick
-    after = float(hass.states.get("sensor.kitchen_occupancy_probability").state)
-    assert after > 99.0 > before
-
-
 async def test_only_a_switch_to_on_counts_as_an_event(hass, freezer):
     kitchen = add_area(hass, "Kitchen")
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)

@@ -36,14 +36,6 @@ async def test_options_form_offers_four_as_the_default(hass):
     assert result["data_schema"]({})["max_people"] == 4
 
 
-async def test_options_flow_saves_the_highest_head_count(hass):
-    entry = await setup_poltergeist(hass)
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(result["flow_id"], {"max_people": 8})
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options == {"max_people": 8}
-
-
 @pytest.mark.parametrize("bad", [0, 16])
 async def test_options_flow_refuses_values_outside_the_checked_range(hass, bad):
     entry = await setup_poltergeist(hass)

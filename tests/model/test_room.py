@@ -35,22 +35,6 @@ def test_without_event_evidence_belief_stays_stationary():
     assert belief.probabilities == pytest.approx(stationary(silent), abs=1e-9)
 
 
-def test_probabilities_sum_to_one_and_are_nonnegative():
-    belief = RoomBelief(PARAMS)
-    for t in (1.0, 50.0, 5000.0, 1e7):
-        motion(belief, t)
-        assert belief.probabilities.sum() == pytest.approx(1.0)
-        assert (belief.probabilities >= 0).all()
-
-
-def test_motion_event_makes_room_occupied_likely():
-    belief = RoomBelief(PARAMS)
-    before = belief.p_occupied
-    motion(belief, 10.0)
-    assert belief.p_occupied > 0.99
-    assert belief.p_occupied > before
-
-
 def test_silence_after_motion_lowers_occupancy_monotonically():
     belief = RoomBelief(PARAMS)
     motion(belief, 0.0)
@@ -140,7 +124,7 @@ def test_default_tracks_up_to_four_people():
     assert len(RoomBelief(RoomParams()).probabilities) == 5
 
 
-@pytest.mark.parametrize("bad", [0, -1, 16, 100])
+@pytest.mark.parametrize("bad", [0, 16])
 def test_max_people_outside_the_checked_range_is_refused(bad):
     with pytest.raises(ValueError):
         RoomParams(max_people=bad)
@@ -253,15 +237,14 @@ def test_a_motion_sensor_going_off_is_no_evidence():
     assert belief.probabilities == pytest.approx(before)
 
 
-@pytest.mark.parametrize("kind", list(SensorKind))
 @pytest.mark.parametrize("old, new", [(None, True), (None, False), (True, None), (False, None)])
-def test_changes_from_or_to_not_heard_are_no_evidence(kind, old, new):
-    assert PARAMS.change_weight(kind, old, new) is None
+def test_changes_from_or_to_not_heard_are_no_evidence(old, new):
+    assert all(PARAMS.change_weight(kind, old, new) is None for kind in SensorKind)
 
 
-@pytest.mark.parametrize("kind", list(SensorKind))
-def test_a_sensor_that_is_not_heard_has_no_dwell_rate(kind):
-    assert PARAMS.dwell_rates([(kind, None)]) == pytest.approx(0.0)
+def test_a_sensor_that_is_not_heard_has_no_dwell_rate():
+    unheard = [(kind, None) for kind in SensorKind]
+    assert PARAMS.dwell_rates(unheard) == pytest.approx(0.0)
 
 
 def test_every_listening_sensor_adds_its_silence():

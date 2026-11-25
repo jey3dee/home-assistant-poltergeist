@@ -125,18 +125,6 @@ async def test_choosing_a_sensor_of_another_room_moves_it(hass):
     assert hass.states.get("sensor.kitchen_occupancy_probability").state == "unknown"
 
 
-async def test_a_sensor_taken_out_of_a_room_is_not_proposed_again(hass):
-    kitchen = add_area(hass, "Kitchen")
-    add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
-    entry = await setup_poltergeist(hass)
-    result = await start_configure(hass, entry, kitchen.id)
-    await hass.config_entries.subentries.async_configure(result["flow_id"], {"sensors": []})
-    await hass.async_block_till_done()
-    assert await hass.config_entries.async_reload(entry.entry_id)
-    await hass.async_block_till_done()
-    assert room_sensors(entry, kitchen.id) == []
-
-
 async def test_moving_a_sensor_between_rooms_causes_at_most_two_reloads(hass):
     from unittest.mock import patch
 

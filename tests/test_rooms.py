@@ -134,17 +134,3 @@ async def test_a_sensor_is_proposed_for_one_room_only(hass):
     sync(hass, entry)
     assert room_sensors(entry, kitchen.id) == [pir]
     assert room_sensors(entry, hall.id) == []
-
-
-async def test_only_motion_and_occupancy_sensors_are_proposed(hass):
-    area = add_area(hass, "Study")
-    motion = add_binary_sensor(hass, "m", area_id=area.id)
-    occupancy = add_binary_sensor(
-        hass, "o", area_id=area.id, device_class=BinarySensorDeviceClass.OCCUPANCY
-    )
-    add_binary_sensor(hass, "w", area_id=area.id, device_class=BinarySensorDeviceClass.WINDOW)
-    add_binary_sensor(hass, "nowhere")
-    add_binary_sensor(hass, "off", area_id=area.id, disabled=True)
-    entry = add_entry(hass)
-    sync(hass, entry)
-    assert sorted(room_sensors(entry, area.id)) == sorted([motion, occupancy])

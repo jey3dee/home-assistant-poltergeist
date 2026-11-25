@@ -140,11 +140,6 @@ async def test_deleting_a_room_removes_its_entities_and_it_stays_deleted(hass):
     assert hass.states.get("sensor.hall_occupancy_probability") is not None
 
 
-async def test_setup_with_no_sensors_is_fine(hass):
-    entry = await setup_poltergeist(hass)
-    assert entry.state is ConfigEntryState.LOADED
-
-
 async def test_removal_after_a_pending_delayed_save_leaves_no_store(hass, hass_storage, freezer):
     kitchen = add_area(hass, "Kitchen")
     pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)

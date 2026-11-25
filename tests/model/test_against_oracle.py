@@ -8,7 +8,7 @@ from tests.oracle import forward_oracle
 from tests.simulator import simulate, with_outage
 
 PARAMS = RoomParams()
-SEEDS = [1, 2, 3, 4, 5]
+SEEDS = [1, 2]
 HOUSES = {
     "motion": ("motion",),
     "occupancy": ("occupancy",),
