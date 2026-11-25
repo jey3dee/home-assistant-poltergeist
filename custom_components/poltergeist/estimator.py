@@ -112,6 +112,7 @@ class Estimator:
     ):
         self.hass = hass
         self._store = store
+        self._save_pending = False
         self._update_listeners = update_listeners
         self._params = params
         self.rooms: dict[str, TrackedRoom] = {}
@@ -186,9 +187,18 @@ class Estimator:
     def _after_change(self, room: TrackedRoom) -> None:
         room.notify(dt_util.utcnow().timestamp())
         self._update_listeners.notify()
-        self._store.async_delay_save(self._stored_data, SAVE_DELAY)
+        self._save_soon()
+
+    def _save_soon(self) -> None:
+        # Home Assistant restarts the wait on every call, so ask only once per write: otherwise
+        # sensors that keep changing would put the save off for as long as they do.
+        if not self._save_pending:
+            self._save_pending = True
+            self._store.async_delay_save(self._stored_data, SAVE_DELAY)
 
     def _stored_data(self) -> dict:
+        """What is written. Every write, delayed or not, asks for it here."""
+        self._save_pending = False
         return {"rooms": {a: r.belief.snapshot() for a, r in self.rooms.items()}}
 
     async def async_save(self) -> None:

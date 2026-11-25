@@ -217,3 +217,26 @@ async def test_reload_requests_are_merged_until_a_reload_has_started(hass):
         listeners.reload_started()
         listeners.request_reload(hass)
         assert schedule.call_count == 2  # a change after the reload began needs its own
+
+
+async def _keep_switching(hass, freezer, sensor, seconds, every=30):
+    """The sensor changes more often than a save waits."""
+    for i in range(seconds // every):
+        hass.states.async_set(sensor, "off" if i % 2 else "on")
+        await hass.async_block_till_done()
+        freezer.tick(timedelta(seconds=every))
+        async_fire_time_changed(hass, dt_util.utcnow())
+        await hass.async_block_till_done()
+
+
+async def test_beliefs_are_saved_while_sensors_keep_changing(hass, hass_storage, freezer):
+    kitchen = add_area(hass, "Kitchen")
+    pir = add_binary_sensor(hass, "kitchen_pir", area_id=kitchen.id)
+    await setup_poltergeist(hass)
+
+    await _keep_switching(hass, freezer, pir, 120)
+    first = hass_storage[DOMAIN]["data"]["rooms"][kitchen.id]["t"]
+    assert dt_util.utcnow().timestamp() - first < 120
+
+    await _keep_switching(hass, freezer, pir, 120)  # and it goes on saving after that
+    assert hass_storage[DOMAIN]["data"]["rooms"][kitchen.id]["t"] > first + 60
