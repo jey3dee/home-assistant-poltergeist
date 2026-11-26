@@ -1,0 +1,20 @@
+{
+  "domain": "poltergeist",
+  "name": "Poltergeist",
+  "categories": ["sensors.motion_presence"],
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [
+    "http",
+    "frontend",
+    "panel_custom",
+    "websocket_api"
+  ],
+  "documentation": "https://github.com/jey3dee/home-assistant-poltergeist",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/jey3dee/home-assistant-poltergeist/issues",
+  "requirements": ["numpy>=2.3.2"],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

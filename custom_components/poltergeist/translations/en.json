@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Poltergeist",
+        "description": "Estimate where people are in the house from the motion and occupancy sensors of each room. Rooms are made from your areas. Nothing needs to be configured here."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Poltergeist is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Poltergeist",
+        "description": "The highest number of people tracked in a room. Read the top count roughly as \"this many or more\". Motion and occupancy sensors cannot tell these counts apart; a higher value only matters once sensors that count people are added. Changing it reloads the integration.",
+        "data": {
+          "max_people": "Highest head count to track"
+        },
+        "data_description": {
+          "max_people": "1 to 15. The default is 4."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "occupancy_probability": {
+        "name": "Probability"
+      },
+      "expected_head_count": {
+        "name": "Expected head count"
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Room",
+      "initiate_flow": {
+        "user": "Add room",
+        "reconfigure": "Choose sensors"
+      },
+      "step": {
+        "user": {
+          "title": "Add a room",
+          "description": "Rooms are the areas of Home Assistant. Pick an area that has no room; the room starts with the motion and occupancy sensors that are in that area and not watching another room yet.",
+          "data": {
+            "area": "Area"
+          }
+        },
+        "reconfigure": {
+          "title": "Sensors of {room}",
+          "description": "The motion and occupancy sensors that watch this room. A sensor can only watch one room: choosing one that watches another room moves it here.",
+          "data": {
+            "sensors": "Sensors"
+          }
+        }
+      },
+      "abort": {
+        "all_areas_are_rooms": "Every area of Home Assistant is already a room.",
+        "area_gone": "That area no longer exists. Select Add room again.",
+        "reconfigure_successful": "Saved."
+      }
+    }
+  }
+}
