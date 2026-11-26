@@ -58,7 +58,7 @@ To move to a new release, change the two `homeassistant==` pins and the frontend
 
 ### Versions and releases
 
-The release version lives in one place: `version` in `custom_components/poltergeist/manifest.json`. Home Assistant reads it there, and the panel's address carries it so browsers load a new `panel.js` after an update. `pyproject.toml` and `frontend/package.json` say `0.0.0` and stay there; neither package is published, and nothing reads their version. That way a release changes no lockfile.
+The release version lives in one place: `version` in `custom_components/poltergeist/manifest.json`. Home Assistant reads it there, and the panel's address carries it so browsers load a new `panel.js` after an update. `pyproject.toml` and `frontend/package.json` say `0.0.0` and stay there; neither package is published, and nothing reads their version. That way a release changes no lockfile. release-please also keeps the version in its own `version.txt` and `.release-please-manifest.json`; it writes both itself.
 
 Pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/): `type(optional scope)!: description`, for example `fix(panel): keep the tab after a reload`. The *Pull request title* check fails any other title. Pull requests are squash-merged, and the squash commit takes the title as its message, with an empty body. On `main`, the title decides the next version:
 
