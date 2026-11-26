@@ -67,4 +67,4 @@ docker run -d --name poltergeist-dev -p 18123:8123 \
   ghcr.io/home-assistant/home-assistant:2026.11.3
 ```
 
-`dev-config/` is ignored by git. Results of the first runs against 2026.11.2 are in `docs/spike-results.md`.
+`dev-config/` is ignored by git.
