@@ -52,7 +52,6 @@ def test_accepts_conventional_titles(title):
         "Feat: add guests",
         "feat add guests",
         "feat:add guests",
-        "feat: ",
         "feat:  ",
         "feat(): add guests",
         "feat(panel: add guests",

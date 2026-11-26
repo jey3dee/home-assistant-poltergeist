@@ -17,7 +17,5 @@ jobs:
       # the GitHub release. A tag or release made with GITHUB_TOKEN starts no other
       # workflow, so anything that must follow a release goes here, gated on the
       # release_created output.
+      # Reads release-please-config.json and .release-please-manifest.json by default.
       - uses: googleapis/release-please-action@v5
-        with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
