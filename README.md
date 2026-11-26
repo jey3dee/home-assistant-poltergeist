@@ -27,7 +27,7 @@ Not there yet: persons, other sensor kinds, learning, movement between rooms, th
 Requires Home Assistant 2026.11.3 or newer. Development and the automated tests use exactly 2026.11.3; newer versions are not tested until the pin moves.
 
 1. Build the panel (see below). `custom_components/poltergeist/panel.js` is committed, so this is only needed after changing the front end.
-2. Copy `custom_components/poltergeist` into the `custom_components` folder of your Home Assistant configuration and restart Home Assistant.
+2. Unpack `poltergeist.zip` from the [latest release](https://github.com/jey3dee/home-assistant-poltergeist/releases/latest) into `custom_components/poltergeist` in your Home Assistant configuration, or copy that folder from the repository (it then reports version `0.0.0`), and restart Home Assistant.
 3. Settings → Devices & services → Add integration → *Poltergeist*.
 
 Put your motion and occupancy sensors into areas first; rooms follow the registry and the integration reloads itself when areas or sensors change.
@@ -56,15 +56,21 @@ The model is checked against an independent reference, a discrete-time forward p
 
 To move to a new release, change the two `homeassistant==` pins and the frontend pin in `pyproject.toml` (the frontend version is in Home Assistant's `components/frontend/manifest.json`) and the minimum in `hacs.json`, then run `uv lock`, `uv sync` and the tests. `tests/test_versions.py` fails if the stated minimum or the frontend does not match. Drop the override and `tests/ha_compat.py` once the harness supports the pinned release.
 
-### Try it in a throwaway Home Assistant
+### Versions and releases
 
-Run the official image of the pinned release with a scratch configuration directory and the integration mounted:
+Every merge to `main` whose title makes a release (see the table) is a release, in the same step: the *Release* workflow (`.github/scripts/release.sh`) reads the commit titles since the last `v*` tag, tags the merged commit `vX.Y.Z` and publishes a GitHub release with `poltergeist.zip` attached. The zip holds `custom_components/poltergeist` as it is in that commit, with the version written into its `manifest.json`. HACS reads the version from the release and installs the zip (`zip_release` in `hacs.json`). Nothing is committed back, so there is no release pull request and no changelog file; the release notes list the titles.
 
-```sh
-docker run -d --name poltergeist-dev -p 18123:8123 \
-  -v "$PWD/dev-config:/config" \
-  -v "$PWD/custom_components/poltergeist:/config/custom_components/poltergeist:ro" \
-  ghcr.io/home-assistant/home-assistant:2026.11.3
-```
+In git, `version` in `manifest.json`, `pyproject.toml` and `frontend/package.json` all say `0.0.0` and stay there. Only the release zip carries a real version. A release changes no file in the repository.
 
-`dev-config/` is ignored by git.
+Pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/): `type(optional scope)!: description`, for example `fix(panel): keep the tab after a reload`. The *Pull request title* check fails any other title. Pull requests are squash-merged, and the squash commit takes the title as its message, with an empty body. The title decides the next version:
+
+| Title | Next version |
+|---|---|
+| `fix: …`, `perf: …`, `revert: …` | patch: 0.1.0 → 0.1.1 |
+| `feat: …` | minor: 0.1.0 → 0.2.0 |
+| any type with `!` | breaking: 0.1.0 → 0.2.0 below 1.0.0, then 1.2.0 → 2.0.0 |
+| `docs`, `chore`, `refactor`, `test`, `build`, `ci` | no release of its own; listed in the next release |
+
+Several titles since the last tag give the largest of their bumps. A change is breaking when users have to set something up again, entity IDs change or saved data is lost.
+
+If the Release workflow fails, the merge stands without a release until the workflow is run again (Actions → Release → Re-run). That is safe: a commit that already has a tag is left alone.

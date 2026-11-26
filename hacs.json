@@ -1,4 +1,6 @@
 {
   "name": "Poltergeist",
-  "homeassistant": "2026.11.3"
+  "homeassistant": "2026.11.3",
+  "zip_release": true,
+  "filename": "poltergeist.zip"
 }

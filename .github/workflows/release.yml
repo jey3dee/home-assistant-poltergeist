@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Two quick merges are released one after the other, never side by side.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the script reads the tags and the titles since the last one
+      # Tags this commit and publishes the GitHub release with poltergeist.zip, or says
+      # why there is no release. Safe to rerun: a commit that is already tagged is left.
+      - run: .github/scripts/release.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
