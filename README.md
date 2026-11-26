@@ -56,6 +56,25 @@ The model is checked against an independent reference, a discrete-time forward p
 
 To move to a new release, change the two `homeassistant==` pins and the frontend pin in `pyproject.toml` (the frontend version is in Home Assistant's `components/frontend/manifest.json`) and the minimum in `hacs.json`, then run `uv lock`, `uv sync` and the tests. `tests/test_versions.py` fails if the stated minimum or the frontend does not match. Drop the override and `tests/ha_compat.py` once the harness supports the pinned release.
 
+### Versions and releases
+
+The release version lives in one place: `version` in `custom_components/poltergeist/manifest.json`. Home Assistant reads it there, and the panel's address carries it so browsers load a new `panel.js` after an update. `pyproject.toml` and `frontend/package.json` say `0.0.0` and stay there; neither package is published, and nothing reads their version. That way a release changes no lockfile. release-please records the last released version in `.release-please-manifest.json` and writes that file itself.
+
+Pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/): `type(optional scope)!: description`, for example `fix(panel): keep the tab after a reload`. The *Pull request title* check fails any other title. Pull requests are squash-merged, and the squash commit takes the title as its message, with an empty body. On `main`, the title decides the next version:
+
+| Title | Next version |
+|---|---|
+| `fix: …`, `perf: …`, `revert: …` | patch: 0.1.0 → 0.1.1 |
+| `feat: …` | minor: 0.1.0 → 0.2.0 |
+| any type with `!` | breaking: 0.1.0 → 0.2.0 below 1.0.0, then 1.2.0 → 2.0.0 |
+| `docs`, `chore`, `refactor`, `test`, `build`, `ci` | no release of its own and not in the changelog; they ship with the next release |
+
+A change is breaking when users have to set something up again, entity IDs change or saved data is lost.
+
+How to release: once `main` has a change that makes a release (see the table), the *Release* workflow (release-please) opens a release pull request and updates it with each later merge. It sets the version in `manifest.json` and writes `CHANGELOG.md`; neither is edited by hand. The pull request is opened with `GITHUB_TOKEN`, so its checks do not start on their own: someone with write access selects **Approve workflows to run** on it. Merging it tags the commit `vX.Y.Z` and publishes the GitHub release, which is where HACS reads the version.
+
+`release-please-config.json` holds `"release-as": "0.1.0"` for the first release only. As long as it is there, every release pull request proposes 0.1.0, so it is removed right after that release.
+
 ### Try it in a throwaway Home Assistant
 
 Run the official image of the pinned release with a scratch configuration directory and the integration mounted:

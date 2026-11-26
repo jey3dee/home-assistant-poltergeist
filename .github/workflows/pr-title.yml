@@ -1,0 +1,19 @@
+name: Pull request title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The title reaches the script only as an environment variable, never as ${{ }} inside
+      # the script, so a title cannot inject shell code.
+      - run: .github/scripts/check-pr-title.sh
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
