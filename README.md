@@ -71,7 +71,9 @@ Pull request titles follow [Conventional Commits](https://www.conventionalcommit
 
 A change is breaking when users have to set something up again, entity IDs change or saved data is lost.
 
-How to release: after each merge to `main`, the *Release* workflow (release-please) opens or updates a release pull request that sets the version in `manifest.json` and writes `CHANGELOG.md`. Neither is edited by hand. Its checks wait until someone with write access selects **Approve workflows to run**, because a pull request opened with `GITHUB_TOKEN` starts no workflows by itself. Merging it tags the commit `vX.Y.Z` and publishes the GitHub release, which is where HACS reads the version.
+How to release: once `main` has a change that makes a release (see the table), the *Release* workflow (release-please) opens a release pull request and updates it with each later merge. It sets the version in `manifest.json` and writes `CHANGELOG.md`; neither is edited by hand. The pull request is opened with `GITHUB_TOKEN`, so its checks do not start on their own: someone with write access selects **Approve workflows to run** on it. Merging it tags the commit `vX.Y.Z` and publishes the GitHub release, which is where HACS reads the version.
+
+`release-please-config.json` holds `"release-as": "0.1.0"` for the first release only. As long as it is there, every release pull request proposes 0.1.0, so it is removed right after that release.
 
 ### Try it in a throwaway Home Assistant
 

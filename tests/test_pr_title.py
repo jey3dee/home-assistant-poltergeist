@@ -1,20 +1,22 @@
 """The pull request title check accepts Conventional Commits titles and nothing else."""
 
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
 SCRIPT = Path(__file__).parent.parent / ".github" / "scripts" / "check-pr-title.sh"
+USAGE = "type(optional scope)!: description"
 
 
-def check(title: str) -> subprocess.CompletedProcess[str]:
+def check(title):
+    """Run the check with PR_TITLE set to title, or unset when title is None."""
+    env = {"PATH": os.environ["PATH"]}
+    if title is not None:
+        env["PR_TITLE"] = title
     return subprocess.run(
-        ["bash", str(SCRIPT)],
-        env={"PR_TITLE": title, "PATH": "/usr/bin:/bin"},
-        capture_output=True,
-        text=True,
-        check=False,
+        ["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=False
     )
 
 
@@ -34,7 +36,7 @@ def check(title: str) -> subprocess.CompletedProcess[str]:
         'revert: "feat: add guests"',
     ],
 )
-def test_accepts_conventional_titles(title: str) -> None:
+def test_accepts_conventional_titles(title):
     result = check(title)
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -42,6 +44,7 @@ def test_accepts_conventional_titles(title: str) -> None:
 @pytest.mark.parametrize(
     "title",
     [
+        None,
         "",
         "Add release automation",
         "14: Add release automation",
@@ -56,20 +59,11 @@ def test_accepts_conventional_titles(title: str) -> None:
         "feat!(panel): add guests",
         " feat: add guests",
         "feat: add guests\nsecond line",
+        "feat: add guests\r",
+        "feat: add\tguests",
     ],
 )
-def test_rejects_other_titles(title: str) -> None:
+def test_rejects_other_titles(title):
     result = check(title)
     assert result.returncode == 1
-    assert "type(optional scope)!: description" in result.stdout
-
-
-def test_rejects_a_missing_title() -> None:
-    result = subprocess.run(
-        ["bash", str(SCRIPT)],
-        env={"PATH": "/usr/bin:/bin"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 1
+    assert USAGE in result.stdout

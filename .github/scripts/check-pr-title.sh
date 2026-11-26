@@ -5,10 +5,11 @@ set -euo pipefail
 
 title="${PR_TITLE-}"
 types='feat|fix|docs|chore|refactor|test|build|ci|perf|revert'
-# [[ =~ ]] matches the whole string, so a title with a line break cannot pass on one line.
 pattern="^(${types})(\([^()[:space:]][^()]*\))?!?: [^[:space:]].*$"
 
-if [[ "$title" == *$'\n'* || ! "$title" =~ $pattern ]]; then
+# In [[ =~ ]], . also matches a line break or other control character, so those are
+# rejected first.
+if [[ "$title" == *[[:cntrl:]]* || ! "$title" =~ $pattern ]]; then
     echo "Pull request title: ${title}"
     echo "It must read type(optional scope)!: description"
     echo "Types: ${types//|/, }"
